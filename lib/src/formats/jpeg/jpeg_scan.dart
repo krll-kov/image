@@ -32,14 +32,15 @@ class JpegScan {
   late int successiveACNextValue;
 
   JpegScan(
-      this.input,
-      this.frame,
-      this.components,
-      this.resetInterval,
-      this.spectralStart,
-      this.spectralEnd,
-      this.successivePrev,
-      this.successive) {
+    this.input,
+    this.frame,
+    this.components,
+    this.resetInterval,
+    this.spectralStart,
+    this.spectralEnd,
+    this.successivePrev,
+    this.successive,
+  ) {
     precision = frame.precision;
     samplesPerLine = frame.samplesPerLine;
     scanLines = frame.scanLines;
@@ -109,6 +110,12 @@ class JpegScan {
 
       // find marker
       bitsCount = 0;
+
+      // do not advance if the input is exhausted, as this may lead to a
+      // RangeError, specifically if the input does not contain the EOI marker,
+      // which is an issue in screenshots taken on Xiaomi devices
+      if (mcu >= mcuExpected) break;
+
       final m1 = input[0];
       final m2 = input[1];
       if (m1 == 0xff) {
@@ -323,11 +330,12 @@ class JpegScan {
   }
 
   void _decodeMcu(
-      JpegComponent component,
-      void Function(JpegComponent, List<int>) decodeFn,
-      int mcu,
-      int row,
-      int col) {
+    JpegComponent component,
+    void Function(JpegComponent, List<int>) decodeFn,
+    int mcu,
+    int row,
+    int col,
+  ) {
     final mcuRow = mcu ~/ mcusPerLine;
     final mcuCol = mcu % mcusPerLine;
     final blockRow = mcuRow * component.vSamples + row;
@@ -342,8 +350,11 @@ class JpegScan {
     decodeFn(component, component.blocks[blockRow][blockCol]);
   }
 
-  void _decodeBlock(JpegComponent component,
-      void Function(JpegComponent, List<int>) decodeFn, int mcu) {
+  void _decodeBlock(
+    JpegComponent component,
+    void Function(JpegComponent, List<int>) decodeFn,
+    int mcu,
+  ) {
     final blockRow = mcu ~/ component.blocksPerLine;
     final blockCol = mcu % component.blocksPerLine;
     decodeFn(component, component.blocks[blockRow][blockCol]);
