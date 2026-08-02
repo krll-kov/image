@@ -8,7 +8,8 @@ enum DitherKernel {
   falseFloydSteinberg,
   floydSteinberg,
   stucki,
-  atkinson
+  atkinson,
+  jarvisJudiceNinke
 }
 
 const _ditherKernels = [
@@ -45,7 +46,7 @@ const _ditherKernels = [
     [2 / 42, 1, 2],
     [1 / 42, 2, 2]
   ],
-  //Atkinson:
+  // Atkinson:
   [
     [1 / 8, 1, 0],
     [1 / 8, 2, 0],
@@ -53,7 +54,22 @@ const _ditherKernels = [
     [1 / 8, 0, 1],
     [1 / 8, 1, 1],
     [1 / 8, 0, 2]
-  ]
+  ],
+  // jarvisJudiceNinke
+  [
+    [7 / 48, 1, 0],
+    [5 / 48, 2, 0],
+    [3 / 48, -2, 1],
+    [5 / 48, -1, 1],
+    [7 / 48, 0, 1],
+    [5 / 48, 1, 1],
+    [3 / 48, 2, 1],
+    [1 / 48, -2, 2],
+    [3 / 48, -1, 2],
+    [5 / 48, 0, 2],
+    [3 / 48, 1, 2],
+    [1 / 48, 2, 2],
+  ],
 ];
 
 /// Dither an image to reduce banding patterns when reducing the number of
