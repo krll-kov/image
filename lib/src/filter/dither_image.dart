@@ -167,9 +167,10 @@ Image ditherImage(
     return ditherImageBayer(image, quantizer, kernel, bayerStrength);
   }
 
-  final order = scanOrder ??
+  final order = serpentine
       // ignore: deprecated_member_use_from_same_package
-      (serpentine ? DitherScanOrder.serpentine : DitherScanOrder.raster);
+      ? DitherScanOrder.serpentine
+      : scanOrder;
 
   final q = quantizer;
   final ds = _ditherKernels[kernel.index];
