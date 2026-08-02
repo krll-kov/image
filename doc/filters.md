@@ -120,11 +120,33 @@ Image copyImageChannels(Image src, { required Image from, bool scaled = false,
 ```dart
 Image ditherImage(Image image, { Quantizer? quantizer,
   DitherKernel kernel = DitherKernel.floydSteinberg,
-  bool serpentine = false,
-  double bayerStrength = 1.0 })
+  @Deprecated('Use scanOrder') bool serpentine = false,
+  double bayerStrength = 1.0,
+  DitherScanOrder? scanOrder })
 ```
 
 ![ditherImage](images/filter/ditherImage.png)
+
+Supported error-diffusion kernels are `DitherKernel.floydSteinberg`,
+`falseFloydSteinberg`, `stucki`, `atkinson`, `jarvisJudiceNinke` and `burkes`.
+The **Burkes** kernel is a faster two-row variant of Stucki (divisor 32).
+
+`scanOrder` controls the order in which pixels are visited by the
+error-diffusion kernels:
+
+- `DitherScanOrder.raster`: every row left to right (the default).
+- `DitherScanOrder.serpentine`: the direction alternates on every other row
+  (same as `serpentine: true`).
+- `DitherScanOrder.zigzag`: diagonal (JPEG-style) scan along the
+  anti-diagonals `x + y == d`, alternating the direction of each diagonal,
+  which breaks up the horizontal worm artifacts of raster scanning.
+
+The old `serpentine` boolean is **deprecated** in favor of `scanOrder` and
+will be removed in a future release; it is ignored when `scanOrder` is given
+explicitly. Neither has an effect on Bayer kernels. The same deprecation
+applies to the `ditherSerpentine` flag of `quantize`, `encodeGif`,
+`encodeGifFile` and `GifEncoder`, which all gained a `ditherScanOrder`
+replacement.
 
 `ditherImage` also supports ordered **Bayer** dithering via the
 `DitherKernel.bayer2x2`, `bayer4x4` and `bayer8x8` kernels. Unlike the
@@ -271,7 +293,9 @@ Image pixelate(Image src, { required int size,
 
 ```dart
 Image quantize(Image src, { int numberOfColors = 256, QuantizeMethod method = QuantizeMethod.neuralNet,
-  DitherKernel dither = DitherKernel.none, bool ditherSerpentine = false })
+  DitherKernel dither = DitherKernel.none,
+  @Deprecated('Use ditherScanOrder') bool ditherSerpentine = false,
+  DitherScanOrder? ditherScanOrder })
 ```
 
 ![quantize](images/filter/quantize.png)

@@ -30,6 +30,16 @@ void main() {
         ..createSync(recursive: true)
         ..writeAsBytesSync(encodePng(id));
 
+      id = ditherImage(i0, kernel: DitherKernel.burkes);
+      File('$testOutputPath/filter/dither_Burkes.png')
+        ..createSync(recursive: true)
+        ..writeAsBytesSync(encodePng(id));
+
+      id = ditherImage(i0, scanOrder: DitherScanOrder.zigzag);
+      File('$testOutputPath/filter/dither_FloydSteinberg_zigzag.png')
+        ..createSync(recursive: true)
+        ..writeAsBytesSync(encodePng(id));
+
       id = ditherImage(i0, kernel: DitherKernel.bayer8x8);
       File('$testOutputPath/filter/dither_Bayer8x8.png')
         ..createSync(recursive: true)

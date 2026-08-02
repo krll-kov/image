@@ -8,11 +8,19 @@ import 'dither_image.dart';
 enum QuantizeMethod { neuralNet, octree, binary }
 
 /// Quantize the number of colors in image to 256.
-Image quantize(Image src,
-    {int numberOfColors = 256,
-    QuantizeMethod method = QuantizeMethod.neuralNet,
-    DitherKernel dither = DitherKernel.none,
-    bool ditherSerpentine = false}) {
+///
+/// `ditherSerpentine` is deprecated in favor of [ditherScanOrder] and is
+/// ignored when [ditherScanOrder] is given explicitly.
+Image quantize(
+  Image src, {
+  int numberOfColors = 256,
+  QuantizeMethod method = QuantizeMethod.neuralNet,
+  DitherKernel dither = DitherKernel.none,
+  @Deprecated('Use ditherScanOrder: DitherScanOrder.serpentine instead. '
+      'This parameter will be removed in a future release.')
+  bool ditherSerpentine = false,
+  DitherScanOrder? ditherScanOrder,
+}) {
   Quantizer quantizer;
 
   if (method == QuantizeMethod.octree || numberOfColors < 4) {
@@ -23,6 +31,14 @@ Image quantize(Image src,
     quantizer = BinaryQuantizer();
   }
 
-  return ditherImage(src,
-      quantizer: quantizer, kernel: dither, serpentine: ditherSerpentine);
+  final order = ditherScanOrder ??
+      // ignore: deprecated_member_use_from_same_package
+      (ditherSerpentine ? DitherScanOrder.serpentine : DitherScanOrder.raster);
+
+  return ditherImage(
+    src,
+    quantizer: quantizer,
+    kernel: dither,
+    scanOrder: order,
+  );
 }

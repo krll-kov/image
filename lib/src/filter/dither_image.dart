@@ -10,9 +10,27 @@ enum DitherKernel {
   stucki,
   atkinson,
   jarvisJudiceNinke,
+  burkes,
   bayer2x2,
   bayer4x4,
   bayer8x8
+}
+
+/// The order in which pixels are visited by the error-diffusion kernels.
+enum DitherScanOrder {
+  /// Standard raster scan: every row is traversed left to right, top to
+  /// bottom.
+  raster,
+
+  /// Boustrophedon (snake) scan: the horizontal direction is reversed on
+  /// every other row, which reduces directional artifacts.
+  serpentine,
+
+  /// Diagonal zigzag scan (the JPEG-style ordering): pixels are visited along
+  /// anti-diagonals (`x + y == d`), alternating the direction of each
+  /// diagonal. It spreads the error along both axes, which softens the
+  /// horizontal worm patterns typical of raster scanning.
+  zigzag,
 }
 
 /// Ordered (Bayer) dither matrices with values normalized to [0, 1).
@@ -82,7 +100,7 @@ const _ditherKernels = [
     [1 / 8, 1, 1],
     [1 / 8, 0, 2]
   ],
-  // jarvisJudiceNinke
+  // JarvisJudiceNinke
   [
     [7 / 48, 1, 0],
     [5 / 48, 2, 0],
@@ -96,6 +114,16 @@ const _ditherKernels = [
     [5 / 48, 0, 2],
     [3 / 48, 1, 2],
     [1 / 48, 2, 2],
+  ],
+  // Burkes
+  [
+    [8 / 32, 1, 0],
+    [4 / 32, 2, 0],
+    [2 / 32, -2, 1],
+    [4 / 32, -1, 1],
+    [8 / 32, 0, 1],
+    [4 / 32, 1, 1],
+    [2 / 32, 2, 1],
   ],
 ];
 
@@ -112,8 +140,14 @@ const _ditherKernels = [
 /// [DitherKernel.bayer4x4], [DitherKernel.bayer8x8]) use a fixed
 /// position-based threshold matrix.
 ///
-/// [serpentine] reverses the scan direction on every other row.
-/// it has no effect on the (symmetric) Bayer matrices.
+/// `serpentine` reverses the scan direction on every other row. It is
+/// deprecated in favor of [scanOrder] and is ignored when [scanOrder] is
+/// given explicitly. It has no effect on the (symmetric) Bayer matrices.
+///
+/// [scanOrder] selects the order in which pixels are visited by the
+/// error-diffusion kernels ([DitherScanOrder.raster],
+/// [DitherScanOrder.serpentine] or the diagonal [DitherScanOrder.zigzag]).
+/// It has no effect on the Bayer kernels.
 ///
 /// [bayerStrength] scales the dither offset and is only used for the Bayer
 /// kernels; it is ignored by the error-diffusion kernels.
@@ -121,8 +155,11 @@ Image ditherImage(
   Image image, {
   Quantizer? quantizer,
   DitherKernel kernel = DitherKernel.floydSteinberg,
+  @Deprecated('Use scanOrder: DitherScanOrder.serpentine instead. '
+      'This parameter will be removed in a future release.')
   bool serpentine = false,
   double bayerStrength = 1.0,
+  DitherScanOrder? scanOrder,
 }) {
   quantizer ??= NeuralQuantizer(image);
 
@@ -134,11 +171,14 @@ Image ditherImage(
     return ditherImageBayer(image, quantizer, kernel, bayerStrength);
   }
 
+  final order = scanOrder ??
+      // ignore: deprecated_member_use_from_same_package
+      (serpentine ? DitherScanOrder.serpentine : DitherScanOrder.raster);
+
+  final q = quantizer;
   final ds = _ditherKernels[kernel.index];
   final height = image.height;
   final width = image.width;
-
-  var direction = serpentine ? -1 : 1;
 
   final palette = quantizer.palette;
   final indexedImage = Image(
@@ -150,55 +190,84 @@ Image ditherImage(
 
   final imageCopy = image.clone();
 
+  // Quantizes the pixel at [x],[y] and diffuses its error to the neighbors.
+  // [direction] is the horizontal scan direction (1 or -1) and controls the
+  // order in which the kernel taps are applied.
+  void diffusePixel(int x, int y, int direction) {
+    // Get original color
+    final pc = imageCopy.getPixel(x, y);
+    final r1 = pc[0].toInt();
+    final g1 = pc[1].toInt();
+    final b1 = pc[2].toInt();
+
+    // Get converted color
+    final idx = q.getColorIndexRgb(r1, g1, b1);
+    indexedImage.setPixelIndex(x, y, idx);
+
+    final r2 = palette.get(idx, 0);
+    final g2 = palette.get(idx, 1);
+    final b2 = palette.get(idx, 2);
+
+    final er = r1 - r2;
+    final eg = g1 - g2;
+    final eb = b1 - b2;
+
+    if (er == 0 && eg == 0 && eb == 0) {
+      return;
+    }
+
+    final i0 = direction == 1 ? 0 : ds.length - 1;
+    final i1 = direction == 1 ? ds.length : 0;
+    for (var i = i0; i != i1; i += direction) {
+      final x1 = ds[i][1].toInt();
+      final y1 = ds[i][2].toInt();
+      if ((x1 + x) >= 0 &&
+          (x1 + x) < width &&
+          (y1 + y) >= 0 &&
+          (y1 + y) < height) {
+        final d = ds[i][0];
+        final nx = x + x1;
+        final ny = y + y1;
+        final p2 = imageCopy.getPixel(nx, ny);
+        p2
+          ..r = p2.r + er * d
+          ..g = p2.g + eg * d
+          ..b = p2.b + eb * d;
+      }
+    }
+  }
+
+  if (order == DitherScanOrder.zigzag) {
+    // Walk the anti-diagonals x + y == d, alternating their direction.
+    final numDiagonals = width + height - 1;
+    for (var d = 0; d < numDiagonals; d++) {
+      final xMin = d < height ? 0 : d - height + 1;
+      final xMax = d < width ? d : width - 1;
+      if (d.isEven) {
+        for (var x = xMin; x <= xMax; x++) {
+          diffusePixel(x, d - x, 1);
+        }
+      } else {
+        for (var x = xMax; x >= xMin; x--) {
+          diffusePixel(x, d - x, 1);
+        }
+      }
+    }
+    return indexedImage;
+  }
+
+  final isSerpentine = order == DitherScanOrder.serpentine;
+  var direction = isSerpentine ? -1 : 1;
+
   for (var y = 0; y < height; y++) {
-    if (serpentine) {
+    if (isSerpentine) {
       direction = direction * -1;
     }
 
     final x0 = direction == 1 ? 0 : width - 1;
     final x1 = direction == 1 ? width : 0;
     for (var x = x0; x != x1; x += direction) {
-      // Get original color
-      final pc = imageCopy.getPixel(x, y);
-      final r1 = pc[0].toInt();
-      final g1 = pc[1].toInt();
-      final b1 = pc[2].toInt();
-
-      // Get converted color
-      final idx = quantizer.getColorIndexRgb(r1, g1, b1);
-      indexedImage.setPixelIndex(x, y, idx);
-
-      final r2 = palette.get(idx, 0);
-      final g2 = palette.get(idx, 1);
-      final b2 = palette.get(idx, 2);
-
-      final er = r1 - r2;
-      final eg = g1 - g2;
-      final eb = b1 - b2;
-
-      if (er == 0 && eg == 0 && eb == 0) {
-        continue;
-      }
-
-      final i0 = direction == 1 ? 0 : ds.length - 1;
-      final i1 = direction == 1 ? ds.length : 0;
-      for (var i = i0; i != i1; i += direction) {
-        final x1 = ds[i][1].toInt();
-        final y1 = ds[i][2].toInt();
-        if ((x1 + x) >= 0 &&
-            (x1 + x) < width &&
-            (y1 + y) >= 0 &&
-            (y1 + y) < height) {
-          final d = ds[i][0];
-          final nx = x + x1;
-          final ny = y + y1;
-          final p2 = imageCopy.getPixel(nx, ny);
-          p2
-            ..r = p2.r + er * d
-            ..g = p2.g + eg * d
-            ..b = p2.b + eb * d;
-        }
-      }
+      diffusePixel(x, y, direction);
     }
   }
 

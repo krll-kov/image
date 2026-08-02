@@ -150,11 +150,13 @@ void decodeGifFile(String path);
 
 void encodeGif({ int samplingFactor = 10,
     DitherKernel dither = DitherKernel.floydSteinberg,
-    bool ditherSerpentine = false });
+    @Deprecated('Use ditherScanOrder') bool ditherSerpentine = false,
+    DitherScanOrder? ditherScanOrder });
 
 void encodeGifFile(String path, { int samplingFactor = 10,
     DitherKernel dither = DitherKernel.floydSteinberg,
-    bool ditherSerpentine = false });
+    @Deprecated('Use ditherScanOrder') bool ditherSerpentine = false,
+    DitherScanOrder? ditherScanOrder });
 
 void decodeIco(Uint8List data);
 
@@ -312,7 +314,8 @@ void copyImageChannels({ required Command? from, bool scaled = false,
 
 void ditherImage({ Quantizer? quantizer,
   DitherKernel kernel = DitherKernel.floydSteinberg,
-  bool serpentine = false });
+  @Deprecated('Use scanOrder') bool serpentine = false,
+  DitherScanOrder? scanOrder });
 
 void dotScreen({ num angle = 180, num size = 5.75, int? centerX,
   int? centerY, num amount = 1, Command? mask,
@@ -364,7 +367,8 @@ void pixelate({ required int size, PixelateMode mode = PixelateMode.upperLeft,
 void quantize({ int numberOfColors = 256,
   QuantizeMethod method = QuantizeMethod.neuralNet,
   DitherKernel dither = DitherKernel.none,
-  bool ditherSerpentine = false });
+  @Deprecated('Use ditherScanOrder') bool ditherSerpentine = false,
+  DitherScanOrder? ditherScanOrder });
 
 void reinhardTonemap({ Command? mask,
   Channel maskChannel = Channel.luminance });

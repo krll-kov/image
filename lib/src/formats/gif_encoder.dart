@@ -17,22 +17,38 @@ class GifEncoder extends Encoder {
   QuantizerType quantizerType;
   int samplingFactor;
   DitherKernel dither;
+
+  /// Deprecated: use [ditherScanOrder] instead.
+  @Deprecated('Use ditherScanOrder: DitherScanOrder.serpentine instead. '
+      'This will be removed in a future release.')
   bool ditherSerpentine;
+
+  /// The order in which pixels are visited by the error-diffusion dither
+  /// kernels. When null, the deprecated `ditherSerpentine` is used instead.
+  DitherScanOrder? ditherScanOrder;
 
   /// The disposal method applied to each frame: 0 = no action,
   /// 1 = do not dispose, 2 = restore to background, 3 = restore to previous.
   int dispose;
 
-  GifEncoder(
-      {this.delay = 80,
-      this.repeat = 0,
-      this.numColors = 256,
-      this.quantizerType = QuantizerType.neural,
-      this.samplingFactor = 10,
-      this.dither = DitherKernel.floydSteinberg,
-      this.ditherSerpentine = false,
-      this.dispose = 2})
-      : _encodedFrames = 0;
+  GifEncoder({
+    this.delay = 80,
+    this.repeat = 0,
+    this.numColors = 256,
+    this.quantizerType = QuantizerType.neural,
+    this.samplingFactor = 10,
+    this.dither = DitherKernel.floydSteinberg,
+    @Deprecated('Use ditherScanOrder: DitherScanOrder.serpentine instead. '
+        'This will be removed in a future release.')
+    this.ditherSerpentine = false,
+    this.ditherScanOrder,
+    this.dispose = 2,
+  }) : _encodedFrames = 0;
+
+  DitherScanOrder get _scanOrder =>
+      ditherScanOrder ??
+      // ignore: deprecated_member_use_from_same_package
+      (ditherSerpentine ? DitherScanOrder.serpentine : DitherScanOrder.raster);
 
   /// This adds the frame passed to [image].
   /// After the last frame has been added, [finish] is required to be called.
@@ -52,9 +68,7 @@ class GifEncoder extends Encoder {
         }
 
         _lastImage = ditherImage(image,
-            quantizer: _lastColorMap!,
-            kernel: dither,
-            serpentine: ditherSerpentine);
+            quantizer: _lastColorMap!, kernel: dither, scanOrder: _scanOrder);
       } else {
         _lastImage = image;
       }
@@ -86,9 +100,7 @@ class GifEncoder extends Encoder {
       }
 
       _lastImage = ditherImage(image,
-          quantizer: _lastColorMap!,
-          kernel: dither,
-          serpentine: ditherSerpentine);
+          quantizer: _lastColorMap!, kernel: dither, scanOrder: _scanOrder);
     } else {
       _lastImage = image;
     }

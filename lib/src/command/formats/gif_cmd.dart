@@ -34,23 +34,40 @@ class DecodeGifFileCmd extends Command {
 class EncodeGifCmd extends Command {
   int samplingFactor;
   DitherKernel dither;
+
+  /// Deprecated: use [ditherScanOrder] instead.
+  @Deprecated('Use ditherScanOrder: DitherScanOrder.serpentine instead. '
+      'This will be removed in a future release.')
   bool ditherSerpentine;
 
-  EncodeGifCmd(Command? input,
-      {this.samplingFactor = 10,
-      this.dither = DitherKernel.floydSteinberg,
-      this.ditherSerpentine = false})
-      : super(input);
+  DitherScanOrder? ditherScanOrder;
+
+  EncodeGifCmd(
+    Command? input, {
+    this.samplingFactor = 10,
+    this.dither = DitherKernel.floydSteinberg,
+    @Deprecated('Use ditherScanOrder: DitherScanOrder.serpentine instead. '
+        'This will be removed in a future release.')
+    this.ditherSerpentine = false,
+    this.ditherScanOrder,
+  }) : super(input);
+
+  DitherScanOrder get scanOrder =>
+      ditherScanOrder ??
+      // ignore: deprecated_member_use_from_same_package
+      (ditherSerpentine ? DitherScanOrder.serpentine : DitherScanOrder.raster);
 
   @override
   Future<void> executeCommand() async {
     await input?.execute();
     outputImage = input?.outputImage;
     if (outputImage != null) {
-      outputBytes = encodeGif(outputImage!,
-          samplingFactor: samplingFactor,
-          dither: dither,
-          ditherSerpentine: ditherSerpentine);
+      outputBytes = encodeGif(
+        outputImage!,
+        samplingFactor: samplingFactor,
+        dither: dither,
+        ditherScanOrder: scanOrder,
+      );
     }
   }
 }
@@ -60,24 +77,38 @@ class EncodeGifCmd extends Command {
 class EncodeGifFileCmd extends EncodeGifCmd {
   String path;
 
-  EncodeGifFileCmd(Command? input, this.path,
-      {int samplingFactor = 10,
-      DitherKernel dither = DitherKernel.floydSteinberg,
-      bool ditherSerpentine = false})
-      : super(input,
-            samplingFactor: samplingFactor,
-            dither: dither,
-            ditherSerpentine: ditherSerpentine);
+  EncodeGifFileCmd(
+    Command? input,
+    this.path, {
+    int samplingFactor = 10,
+    DitherKernel dither = DitherKernel.floydSteinberg,
+    @Deprecated('Use ditherScanOrder: DitherScanOrder.serpentine instead. '
+        'This will be removed in a future release.')
+    bool ditherSerpentine = false,
+    DitherScanOrder? ditherScanOrder,
+  }) : super(
+          input,
+          samplingFactor: samplingFactor,
+          dither: dither,
+          ditherScanOrder: ditherScanOrder ??
+              // ignore: deprecated_member_use_from_same_package
+              (ditherSerpentine
+                  ? DitherScanOrder.serpentine
+                  : DitherScanOrder.raster),
+        );
 
   @override
   Future<void> executeCommand() async {
     await input?.execute();
     outputImage = input?.outputImage;
     if (outputImage != null) {
-      await encodeGifFile(path, outputImage!,
-          samplingFactor: samplingFactor,
-          dither: dither,
-          ditherSerpentine: ditherSerpentine);
+      await encodeGifFile(
+        path,
+        outputImage!,
+        samplingFactor: samplingFactor,
+        dither: dither,
+        ditherScanOrder: scanOrder,
+      );
     }
   }
 }
