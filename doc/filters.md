@@ -120,10 +120,23 @@ Image copyImageChannels(Image src, { required Image from, bool scaled = false,
 ```dart
 Image ditherImage(Image image, { Quantizer? quantizer,
   DitherKernel kernel = DitherKernel.floydSteinberg,
-  bool serpentine = false })
+  bool serpentine = false,
+  double bayerStrength = 1.0 })
 ```
 
 ![ditherImage](images/filter/ditherImage.png)
+
+`ditherImage` also supports ordered **Bayer** dithering via the
+`DitherKernel.bayer2x2`, `bayer4x4` and `bayer8x8` kernels. Unlike the
+error-diffusion kernels, it uses a fixed threshold matrix (so `serpentine` has
+no effect), and `bayerStrength` scales the dither amount.
+
+![dither_Bayer8x8.png](images/filter/dither_Bayer8x8.png)
+
+```dart
+Image ditherImageBayer(Image image, [Quantizer? quantizer,
+    DitherKernel kernel = DitherKernel.bayer4x4, double strength = 1.0])
+```
 
 ### [dotScreen](https://pub.dev/documentation/image/latest/image/dotScreen.html)
 

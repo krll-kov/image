@@ -9,8 +9,35 @@ enum DitherKernel {
   floydSteinberg,
   stucki,
   atkinson,
-  jarvisJudiceNinke
+  jarvisJudiceNinke,
+  bayer2x2,
+  bayer4x4,
+  bayer8x8
 }
+
+/// Ordered (Bayer) dither matrices with values normalized to [0, 1).
+const _bayerMatrices = <DitherKernel, List<List<double>>>{
+  DitherKernel.bayer2x2: [
+    [0 / 4, 2 / 4],
+    [3 / 4, 1 / 4]
+  ],
+  DitherKernel.bayer4x4: [
+    [0 / 16, 8 / 16, 2 / 16, 10 / 16],
+    [12 / 16, 4 / 16, 14 / 16, 6 / 16],
+    [3 / 16, 11 / 16, 1 / 16, 9 / 16],
+    [15 / 16, 7 / 16, 13 / 16, 5 / 16]
+  ],
+  DitherKernel.bayer8x8: [
+    [0 / 64, 32 / 64, 8 / 64, 40 / 64, 2 / 64, 34 / 64, 10 / 64, 42 / 64],
+    [48 / 64, 16 / 64, 56 / 64, 24 / 64, 50 / 64, 18 / 64, 58 / 64, 26 / 64],
+    [12 / 64, 44 / 64, 4 / 64, 36 / 64, 14 / 64, 46 / 64, 6 / 64, 38 / 64],
+    [60 / 64, 28 / 64, 52 / 64, 20 / 64, 62 / 64, 30 / 64, 54 / 64, 22 / 64],
+    [3 / 64, 35 / 64, 11 / 64, 43 / 64, 1 / 64, 33 / 64, 9 / 64, 41 / 64],
+    [51 / 64, 19 / 64, 59 / 64, 27 / 64, 49 / 64, 17 / 64, 57 / 64, 25 / 64],
+    [15 / 64, 47 / 64, 7 / 64, 39 / 64, 13 / 64, 45 / 64, 5 / 64, 37 / 64],
+    [63 / 64, 31 / 64, 55 / 64, 23 / 64, 61 / 64, 29 / 64, 53 / 64, 21 / 64]
+  ]
+};
 
 const _ditherKernels = [
   [
@@ -75,14 +102,36 @@ const _ditherKernels = [
 /// Dither an image to reduce banding patterns when reducing the number of
 /// colors.
 /// Derived from http://jsbin.com/iXofIji/2/edit
-Image ditherImage(Image image,
-    {Quantizer? quantizer,
-    DitherKernel kernel = DitherKernel.floydSteinberg,
-    bool serpentine = false}) {
+///
+/// [quantizer] is the color reducer used to map each pixel to the palette;
+/// if `null` a [NeuralQuantizer] is built from [image].
+///
+/// [kernel] selects the dithering algorithm: error-diffusion kernels
+/// (e.g. [DitherKernel.floydSteinberg]) propagate quantization error to
+/// neighbors, while the ordered Bayer kernels ([DitherKernel.bayer2x2],
+/// [DitherKernel.bayer4x4], [DitherKernel.bayer8x8]) use a fixed
+/// position-based threshold matrix.
+///
+/// [serpentine] reverses the scan direction on every other row.
+/// it has no effect on the (symmetric) Bayer matrices.
+///
+/// [bayerStrength] scales the dither offset and is only used for the Bayer
+/// kernels; it is ignored by the error-diffusion kernels.
+Image ditherImage(
+  Image image, {
+  Quantizer? quantizer,
+  DitherKernel kernel = DitherKernel.floydSteinberg,
+  bool serpentine = false,
+  double bayerStrength = 1.0,
+}) {
   quantizer ??= NeuralQuantizer(image);
 
   if (kernel == DitherKernel.none) {
     return quantizer.getIndexImage(image);
+  }
+
+  if (_bayerMatrices.containsKey(kernel)) {
+    return ditherImageBayer(image, quantizer, kernel, bayerStrength);
   }
 
   final ds = _ditherKernels[kernel.index];
@@ -92,8 +141,12 @@ Image ditherImage(Image image,
   var direction = serpentine ? -1 : 1;
 
   final palette = quantizer.palette;
-  final indexedImage =
-      Image(width: width, height: height, numChannels: 1, palette: palette);
+  final indexedImage = Image(
+    width: width,
+    height: height,
+    numChannels: 1,
+    palette: palette,
+  );
 
   final imageCopy = image.clone();
 
@@ -151,3 +204,61 @@ Image ditherImage(Image image,
 
   return indexedImage;
 }
+
+/// Dither an image using an ordered (Bayer) threshold matrix. Unlike the
+/// error-diffusion kernels, the dither pattern is position-based and does not
+/// propagate error to neighboring pixels, making it deterministic and fast.
+///
+/// [kernel] must be one of the Bayer variants ([DitherKernel.bayer2x2],
+/// [DitherKernel.bayer4x4] or [DitherKernel.bayer8x8]); passing any other
+/// [DitherKernel] will trigger an assertion failure.
+///
+/// [quantizer] is the color reducer used to map each pixel to the palette;
+/// if `null` (the default) a [NeuralQuantizer] is built from [image].
+///
+/// [strength] scales the dither offset (defaults to 1.0 for the classic
+/// full-range Bayer look; smaller values give subtler banding reduction).
+Image ditherImageBayer(
+  Image image, [
+  Quantizer? quantizer,
+  DitherKernel kernel = DitherKernel.bayer4x4,
+  double strength = 1.0,
+]) {
+  quantizer ??= NeuralQuantizer(image);
+
+  assert(_bayerMatrices.containsKey(kernel),
+      'kernel must be a Bayer variant: bayer2x2, bayer4x4 or bayer8x8');
+
+  final matrix = _bayerMatrices[kernel]!;
+  final n = matrix.length;
+
+  final height = image.height;
+  final width = image.width;
+
+  final palette = quantizer.palette;
+  final indexedImage = Image(
+    width: width,
+    height: height,
+    numChannels: 1,
+    palette: palette,
+  );
+
+  for (var y = 0; y < height; y++) {
+    final row = matrix[y % n];
+    for (var x = 0; x < width; x++) {
+      final pc = image.getPixel(x, y);
+      // Centered threshold in the range [-0.5, 0.5).
+      final t = row[x % n] - 0.5;
+      final d = t * 255 * strength;
+      final r = _clampChannel(pc[0] + d);
+      final g = _clampChannel(pc[1] + d);
+      final b = _clampChannel(pc[2] + d);
+      final idx = quantizer.getColorIndexRgb(r, g, b);
+      indexedImage.setPixelIndex(x, y, idx);
+    }
+  }
+
+  return indexedImage;
+}
+
+int _clampChannel(num v) => v.clamp(0, 255).round();
