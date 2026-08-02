@@ -140,10 +140,6 @@ const _ditherKernels = [
 /// [DitherKernel.bayer4x4], [DitherKernel.bayer8x8]) use a fixed
 /// position-based threshold matrix.
 ///
-/// `serpentine` reverses the scan direction on every other row. It is
-/// deprecated in favor of [scanOrder] and is ignored when [scanOrder] is
-/// given explicitly. It has no effect on the (symmetric) Bayer matrices.
-///
 /// [scanOrder] selects the order in which pixels are visited by the
 /// error-diffusion kernels ([DitherScanOrder.raster],
 /// [DitherScanOrder.serpentine] or the diagonal [DitherScanOrder.zigzag]).
@@ -158,8 +154,8 @@ Image ditherImage(
   @Deprecated('Use scanOrder: DitherScanOrder.serpentine instead. '
       'This parameter will be removed in a future release.')
   bool serpentine = false,
+  DitherScanOrder scanOrder = DitherScanOrder.zigzag,
   double bayerStrength = 1.0,
-  DitherScanOrder? scanOrder,
 }) {
   quantizer ??= NeuralQuantizer(image);
 
