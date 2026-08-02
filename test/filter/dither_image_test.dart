@@ -35,7 +35,7 @@ void main() {
         ..createSync(recursive: true)
         ..writeAsBytesSync(encodePng(id));
 
-      id = ditherImage(i0, scanOrder: DitherScanOrder.zigzag);
+      id = ditherImage(i0);
       File('$testOutputPath/filter/dither_FloydSteinberg_zigzag.png')
         ..createSync(recursive: true)
         ..writeAsBytesSync(encodePng(id));
