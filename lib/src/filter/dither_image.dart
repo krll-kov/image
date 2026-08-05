@@ -167,7 +167,7 @@ const _bayerMatrices = <DitherKernel, List<List<double>>>{
 /// the space-filling [DitherScanOrder.hilbert] curve).
 /// It has no effect on the Bayer kernels.
 ///
-/// [bayerStrength] scales the dither offset and is only used for the Bayer
+/// [strength] scales the dither offset and is only used for the Bayer
 /// kernels; it is ignored by the error-diffusion kernels.
 Image ditherImage(
   Image image, {
@@ -176,7 +176,7 @@ Image ditherImage(
   // Use scanOrder: DitherScanOrder.serpentine instead.
   bool serpentine = false,
   DitherScanOrder scanOrder = DitherScanOrder.zigzag,
-  double bayerStrength = 1.0,
+  double strength = 1.0,
 }) {
   quantizer ??= NeuralQuantizer(image);
 
@@ -185,7 +185,7 @@ Image ditherImage(
   }
 
   if (_bayerMatrices.containsKey(kernel)) {
-    return ditherImageBayer(image, quantizer, kernel, bayerStrength);
+    return ditherImageBayer(image, quantizer, kernel, strength);
   }
 
   final order = serpentine

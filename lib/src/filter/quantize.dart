@@ -16,6 +16,7 @@ Image quantize(
   // Use ditherScanOrder: DitherScanOrder.serpentine instead.
   bool ditherSerpentine = false,
   DitherScanOrder? ditherScanOrder,
+  double ditherStrength = 1.0,
 }) {
   Quantizer quantizer;
 
@@ -35,5 +36,6 @@ Image quantize(
     quantizer: quantizer,
     kernel: dither,
     scanOrder: order,
+    strength: ditherStrength,
   );
 }
