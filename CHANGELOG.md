@@ -11,9 +11,6 @@
   `encodeGif(ditherScanOrder:)` / `GifEncoder(ditherScanOrder:)` parameters.
   `zigzag` visits pixels along the anti-diagonals, which breaks up the
   horizontal worm artifacts of raster scanning.
-- Deprecate the `serpentine` / `ditherSerpentine` boolean flags in favor of
-  the new scan order parameters. They still work, but will be removed in a
-  future release.
 - Fix binary PNM files being misdetected as TGA, by probing PNM before TGA in
   `findDecoderForData`.
 

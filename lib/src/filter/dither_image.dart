@@ -173,8 +173,7 @@ Image ditherImage(
   Image image, {
   Quantizer? quantizer,
   DitherKernel kernel = DitherKernel.floydSteinberg,
-  @Deprecated('Use scanOrder: DitherScanOrder.serpentine instead. '
-      'This parameter will be removed in a future release.')
+  // Use scanOrder: DitherScanOrder.serpentine instead.
   bool serpentine = false,
   DitherScanOrder scanOrder = DitherScanOrder.zigzag,
   double bayerStrength = 1.0,
@@ -190,7 +189,6 @@ Image ditherImage(
   }
 
   final order = serpentine
-      // ignore: deprecated_member_use_from_same_package
       ? DitherScanOrder.serpentine
       : scanOrder;
 

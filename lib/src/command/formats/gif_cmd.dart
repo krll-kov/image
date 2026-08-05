@@ -35,9 +35,7 @@ class EncodeGifCmd extends Command {
   int samplingFactor;
   DitherKernel dither;
 
-  /// Deprecated: use [ditherScanOrder] instead.
-  @Deprecated('Use ditherScanOrder: DitherScanOrder.serpentine instead. '
-      'This will be removed in a future release.')
+  /// Use [ditherScanOrder] instead.
   bool ditherSerpentine;
 
   DitherScanOrder? ditherScanOrder;
@@ -46,15 +44,12 @@ class EncodeGifCmd extends Command {
     Command? input, {
     this.samplingFactor = 10,
     this.dither = DitherKernel.floydSteinberg,
-    @Deprecated('Use ditherScanOrder: DitherScanOrder.serpentine instead. '
-        'This will be removed in a future release.')
     this.ditherSerpentine = false,
     this.ditherScanOrder,
   }) : super(input);
 
   DitherScanOrder get scanOrder =>
       ditherScanOrder ??
-      // ignore: deprecated_member_use_from_same_package
       (ditherSerpentine ? DitherScanOrder.serpentine : DitherScanOrder.raster);
 
   @override
@@ -82,8 +77,7 @@ class EncodeGifFileCmd extends EncodeGifCmd {
     this.path, {
     int samplingFactor = 10,
     DitherKernel dither = DitherKernel.floydSteinberg,
-    @Deprecated('Use ditherScanOrder: DitherScanOrder.serpentine instead. '
-        'This will be removed in a future release.')
+    // Use ditherScanOrder: DitherScanOrder.serpentine instead.
     bool ditherSerpentine = false,
     DitherScanOrder? ditherScanOrder,
   }) : super(
@@ -91,7 +85,6 @@ class EncodeGifFileCmd extends EncodeGifCmd {
           samplingFactor: samplingFactor,
           dither: dither,
           ditherScanOrder: ditherScanOrder ??
-              // ignore: deprecated_member_use_from_same_package
               (ditherSerpentine
                   ? DitherScanOrder.serpentine
                   : DitherScanOrder.raster),

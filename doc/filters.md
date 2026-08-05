@@ -120,7 +120,7 @@ Image copyImageChannels(Image src, { required Image from, bool scaled = false,
 ```dart
 Image ditherImage(Image image, { Quantizer? quantizer,
   DitherKernel kernel = DitherKernel.floydSteinberg,
-  @Deprecated('Use scanOrder') bool serpentine = false,
+  bool serpentine = false,
   double bayerStrength = 1.0,
   DitherScanOrder? scanOrder })
 ```
@@ -141,10 +141,9 @@ error-diffusion kernels:
   anti-diagonals `x + y == d`, alternating the direction of each diagonal,
   which breaks up the horizontal worm artifacts of raster scanning.
 
-The old `serpentine` boolean is **deprecated** in favor of `scanOrder` and
-will be removed in a future release; it is ignored when `scanOrder` is given
-explicitly. Neither has an effect on Bayer kernels. The same deprecation
-applies to the `ditherSerpentine` flag of `quantize`, `encodeGif`,
+The old `serpentine` boolean is replaced by `scanOrder`; it is ignored when
+`scanOrder` is given explicitly. Neither has an effect on Bayer kernels. The
+same applies to the `ditherSerpentine` flag of `quantize`, `encodeGif`,
 `encodeGifFile` and `GifEncoder`, which all gained a `ditherScanOrder`
 replacement.
 
@@ -294,7 +293,7 @@ Image pixelate(Image src, { required int size,
 ```dart
 Image quantize(Image src, { int numberOfColors = 256, QuantizeMethod method = QuantizeMethod.neuralNet,
   DitherKernel dither = DitherKernel.none,
-  @Deprecated('Use ditherScanOrder') bool ditherSerpentine = false,
+  bool ditherSerpentine = false,
   DitherScanOrder? ditherScanOrder })
 ```
 

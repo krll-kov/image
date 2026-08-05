@@ -255,8 +255,7 @@ class Command {
   void encodeGif({
     int samplingFactor = 10,
     DitherKernel dither = DitherKernel.floydSteinberg,
-    @Deprecated('Use ditherScanOrder: DitherScanOrder.serpentine instead. '
-        'This parameter will be removed in a future release.')
+    // Use ditherScanOrder: DitherScanOrder.serpentine instead.
     bool ditherSerpentine = false,
     DitherScanOrder? ditherScanOrder,
   }) {
@@ -264,7 +263,6 @@ class Command {
         samplingFactor: samplingFactor,
         dither: dither,
         ditherScanOrder: ditherScanOrder ??
-            // ignore: deprecated_member_use_from_same_package
             (ditherSerpentine
                 ? DitherScanOrder.serpentine
                 : DitherScanOrder.raster));
@@ -274,8 +272,7 @@ class Command {
     String path, {
     int samplingFactor = 10,
     DitherKernel dither = DitherKernel.floydSteinberg,
-    @Deprecated('Use ditherScanOrder: DitherScanOrder.serpentine instead. '
-        'This parameter will be removed in a future release.')
+    // Use ditherScanOrder: DitherScanOrder.serpentine instead.
     bool ditherSerpentine = false,
     DitherScanOrder? ditherScanOrder,
   }) {
@@ -283,7 +280,6 @@ class Command {
         samplingFactor: samplingFactor,
         dither: dither,
         ditherScanOrder: ditherScanOrder ??
-            // ignore: deprecated_member_use_from_same_package
             (ditherSerpentine
                 ? DitherScanOrder.serpentine
                 : DitherScanOrder.raster));
@@ -821,8 +817,7 @@ class Command {
   void ditherImage({
     Quantizer? quantizer,
     DitherKernel kernel = DitherKernel.floydSteinberg,
-    @Deprecated('Use scanOrder: DitherScanOrder.serpentine instead. '
-        'This parameter will be removed in a future release.')
+    // Use scanOrder: DitherScanOrder.serpentine instead.
     bool serpentine = false,
     DitherScanOrder? scanOrder,
   }) {
@@ -830,7 +825,6 @@ class Command {
         quantizer: quantizer,
         kernel: kernel,
         scanOrder: scanOrder ??
-            // ignore: deprecated_member_use_from_same_package
             (serpentine ? DitherScanOrder.serpentine : DitherScanOrder.raster));
   }
 
@@ -975,8 +969,7 @@ class Command {
     int numberOfColors = 256,
     QuantizeMethod method = QuantizeMethod.neuralNet,
     DitherKernel dither = DitherKernel.none,
-    @Deprecated('Use ditherScanOrder: DitherScanOrder.serpentine instead. '
-        'This parameter will be removed in a future release.')
+    // Use ditherScanOrder: DitherScanOrder.serpentine instead.
     bool ditherSerpentine = false,
     DitherScanOrder? ditherScanOrder,
   }) {
@@ -985,7 +978,6 @@ class Command {
         method: method,
         dither: dither,
         ditherScanOrder: ditherScanOrder ??
-            // ignore: deprecated_member_use_from_same_package
             (ditherSerpentine
                 ? DitherScanOrder.serpentine
                 : DitherScanOrder.raster));

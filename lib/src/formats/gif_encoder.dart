@@ -18,13 +18,11 @@ class GifEncoder extends Encoder {
   int samplingFactor;
   DitherKernel dither;
 
-  /// Deprecated: use [ditherScanOrder] instead.
-  @Deprecated('Use ditherScanOrder: DitherScanOrder.serpentine instead. '
-      'This will be removed in a future release.')
+  /// Use [ditherScanOrder] instead.
   bool ditherSerpentine;
 
   /// The order in which pixels are visited by the error-diffusion dither
-  /// kernels. When null, the deprecated `ditherSerpentine` is used instead.
+  /// kernels. When null, `ditherSerpentine` is used instead.
   DitherScanOrder? ditherScanOrder;
 
   /// The disposal method applied to each frame: 0 = no action,
@@ -38,8 +36,6 @@ class GifEncoder extends Encoder {
     this.quantizerType = QuantizerType.neural,
     this.samplingFactor = 10,
     this.dither = DitherKernel.floydSteinberg,
-    @Deprecated('Use ditherScanOrder: DitherScanOrder.serpentine instead. '
-        'This will be removed in a future release.')
     this.ditherSerpentine = false,
     this.ditherScanOrder,
     this.dispose = 2,
@@ -47,7 +43,6 @@ class GifEncoder extends Encoder {
 
   DitherScanOrder get _scanOrder =>
       ditherScanOrder ??
-      // ignore: deprecated_member_use_from_same_package
       (ditherSerpentine ? DitherScanOrder.serpentine : DitherScanOrder.raster);
 
   /// This adds the frame passed to [image].

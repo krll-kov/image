@@ -7,9 +7,7 @@ class QuantizeCmd extends Command {
   g.QuantizeMethod method;
   d.DitherKernel dither;
 
-  /// Deprecated: use [ditherScanOrder] instead.
-  @Deprecated('Use ditherScanOrder: DitherScanOrder.serpentine instead. '
-      'This will be removed in a future release.')
+  /// Use [ditherScanOrder] instead.
   bool ditherSerpentine;
 
   d.DitherScanOrder? ditherScanOrder;
@@ -19,8 +17,6 @@ class QuantizeCmd extends Command {
     this.numberOfColors = 256,
     this.method = g.QuantizeMethod.neuralNet,
     this.dither = d.DitherKernel.none,
-    @Deprecated('Use ditherScanOrder: DitherScanOrder.serpentine instead. '
-        'This will be removed in a future release.')
     this.ditherSerpentine = false,
     this.ditherScanOrder,
   }) : super(input);
@@ -29,7 +25,6 @@ class QuantizeCmd extends Command {
   Future<void> executeCommand() async {
     final img = await input?.getImage();
     final order = ditherScanOrder ??
-        // ignore: deprecated_member_use_from_same_package
         (ditherSerpentine
             ? d.DitherScanOrder.serpentine
             : d.DitherScanOrder.raster);

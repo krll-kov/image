@@ -495,17 +495,13 @@ Future<Image?> decodeGifFile(String path, {int? frame}) async {
 /// If you know that you have less than 256 colors in your frames
 /// anyway, you should supply a very large [samplingFactor] for maximum
 /// performance.
-///
-/// `ditherSerpentine` is deprecated in favor of [ditherScanOrder] and is
-/// ignored when [ditherScanOrder] is given explicitly.
 Uint8List encodeGif(
   Image image, {
   bool singleFrame = false,
   int repeat = 0,
   int samplingFactor = 10,
   DitherKernel dither = DitherKernel.floydSteinberg,
-  @Deprecated('Use ditherScanOrder: DitherScanOrder.serpentine '
-      'instead. This parameter will be removed in a future release.')
+  // Use ditherScanOrder: DitherScanOrder.serpentine instead.
   bool ditherSerpentine = false,
   DitherScanOrder? ditherScanOrder,
 }) =>
@@ -513,16 +509,12 @@ Uint8List encodeGif(
             samplingFactor: samplingFactor,
             dither: dither,
             ditherScanOrder: ditherScanOrder ??
-                // ignore: deprecated_member_use_from_same_package
                 (ditherSerpentine
                     ? DitherScanOrder.serpentine
                     : DitherScanOrder.raster))
         .encode(image, singleFrame: singleFrame);
 
 /// Encode an [image] to a GIF file at the given [path].
-///
-/// `ditherSerpentine` is deprecated in favor of [ditherScanOrder] and is
-/// ignored when [ditherScanOrder] is given explicitly.
 Future<bool> encodeGifFile(
   String path,
   Image image, {
@@ -530,8 +522,7 @@ Future<bool> encodeGifFile(
   int repeat = 0,
   int samplingFactor = 10,
   DitherKernel dither = DitherKernel.floydSteinberg,
-  @Deprecated('Use ditherScanOrder: DitherScanOrder.serpentine instead. '
-      'This parameter will be removed in a future release.')
+  // Use ditherScanOrder: DitherScanOrder.serpentine instead.
   bool ditherSerpentine = false,
   DitherScanOrder? ditherScanOrder,
 }) async {
@@ -542,7 +533,6 @@ Future<bool> encodeGifFile(
           samplingFactor: samplingFactor,
           dither: dither,
           ditherScanOrder: ditherScanOrder ??
-              // ignore: deprecated_member_use_from_same_package
               (ditherSerpentine
                   ? DitherScanOrder.serpentine
                   : DitherScanOrder.raster))
