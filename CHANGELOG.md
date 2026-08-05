@@ -6,7 +6,7 @@
   `DitherKernel.bayer2x2`, `DitherKernel.bayer4x4`, `DitherKernel.bayer8x8`
   kernels. Unlike the error-diffusion kernels, the pattern is position-based
   and uses a fixed threshold matrix, so it is deterministic and fast.
-- Add `DitherScanOrder` (`raster`, `serpentine`, `zigzag`) and the
+- Add `DitherScanOrder` (`raster`, `serpentine`, `zigzag`, `hilbert`) and the
   `ditherImage(scanOrder:)` / `quantize(ditherScanOrder:)` /
   `encodeGif(ditherScanOrder:)` / `GifEncoder(ditherScanOrder:)` parameters.
   `zigzag` visits pixels along the anti-diagonals, which breaks up the
