@@ -120,10 +120,54 @@ Image copyImageChannels(Image src, { required Image from, bool scaled = false,
 ```dart
 Image ditherImage(Image image, { Quantizer? quantizer,
   DitherKernel kernel = DitherKernel.floydSteinberg,
-  bool serpentine = false })
+  bool serpentine = false,
+  double strength = 1.0,
+  DitherScanOrder? scanOrder })
 ```
 
 ![ditherImage](images/filter/ditherImage.png)
+
+Supported error-diffusion kernels are `DitherKernel.floydSteinberg`,
+`falseFloydSteinberg`, `stucki`, `atkinson`, `jarvisJudiceNinke` and `burkes`.
+The **Burkes** kernel is a faster two-row variant of Stucki (divisor 32).
+
+`scanOrder` controls the order in which pixels are visited by the
+error-diffusion kernels:
+
+- `DitherScanOrder.raster`: standard raster scan — every row is traversed
+  left to right, top to bottom.
+- `DitherScanOrder.serpentine`: boustrophedon (snake) scan — the horizontal
+  direction is reversed on every other row, which reduces directional
+  artifacts (same as `serpentine: true`).
+- `DitherScanOrder.zigzag`: diagonal zigzag scan (the JPEG-style ordering) —
+  pixels are visited along the anti-diagonals `x + y == d`, alternating the
+  direction of each diagonal. It spreads the error along both axes, which
+  softens the horizontal worm patterns typical of raster scanning.
+  **This is the default.**
+- `DitherScanOrder.hilbert`: Hilbert space-filling curve scan — pixels are
+  visited following the fractal Hilbert curve order, which maximizes spatial
+  locality (every pair of consecutive pixels is adjacent on the grid). This
+  gives the best reduction of directional artifacts among deterministic scan
+  orders and closely approximates random-walk error diffusion without
+  sacrificing determinism.
+
+The old `serpentine` boolean is replaced by `scanOrder`; it is ignored when
+`scanOrder` is given explicitly. Neither has an effect on Bayer kernels. The
+same applies to the `ditherSerpentine` flag of `quantize`, `encodeGif`,
+`encodeGifFile` and `GifEncoder`, which all gained a `ditherScanOrder`
+replacement.
+
+`ditherImage` also supports ordered **Bayer** dithering via the
+`DitherKernel.bayer2x2`, `bayer4x4` and `bayer8x8` kernels. Unlike the
+error-diffusion kernels, it uses a fixed threshold matrix (so `serpentine` has
+no effect), and `strength` scales the dither amount.
+
+![dither_Bayer8x8.png](images/filter/dither_Bayer8x8.png)
+
+```dart
+Image ditherImageBayer(Image image, [Quantizer? quantizer,
+    DitherKernel kernel = DitherKernel.bayer4x4, double strength = 1.0])
+```
 
 ### [dotScreen](https://pub.dev/documentation/image/latest/image/dotScreen.html)
 
@@ -258,7 +302,9 @@ Image pixelate(Image src, { required int size,
 
 ```dart
 Image quantize(Image src, { int numberOfColors = 256, QuantizeMethod method = QuantizeMethod.neuralNet,
-  DitherKernel dither = DitherKernel.none, bool ditherSerpentine = false })
+  DitherKernel dither = DitherKernel.none,
+  bool ditherSerpentine = false,
+  DitherScanOrder? ditherScanOrder })
 ```
 
 ![quantize](images/filter/quantize.png)

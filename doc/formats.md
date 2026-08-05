@@ -85,14 +85,16 @@ Uint8List encodeGif(Image image, {
     int repeat = 0,
     int samplingFactor = 10,
     DitherKernel dither = DitherKernel.floydSteinberg,
-    bool ditherSerpentine = false });
+    bool ditherSerpentine = false,
+    DitherScanOrder? ditherScanOrder });
 
 Future<bool> encodeGifFile(String path, Image image, {
     bool singleFrame = false,
     int repeat = 0,
     int samplingFactor = 10,
     DitherKernel dither = DitherKernel.floydSteinberg,
-    bool ditherSerpentine = false });
+    bool ditherSerpentine = false,
+    DitherScanOrder? ditherScanOrder });
 ```
 ### WebP: decoding only
 ```dart

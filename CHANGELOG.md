@@ -1,5 +1,16 @@
 ## 4.9.2
 
+- Add the `DitherKernel.burkes` and `DitherKernel.jarvisJudiceNinke`
+  error-diffusion kernels.
+- Add ordered (Bayer) matrix dithering via `ditherImageBayer` and the
+  `DitherKernel.bayer2x2`, `DitherKernel.bayer4x4`, `DitherKernel.bayer8x8`
+  kernels. Unlike the error-diffusion kernels, the pattern is position-based
+  and uses a fixed threshold matrix, so it is deterministic and fast.
+- Add `DitherScanOrder` (`raster`, `serpentine`, `zigzag`, `hilbert`) and the
+  `ditherImage(scanOrder:)` / `quantize(ditherScanOrder:)` /
+  `encodeGif(ditherScanOrder:)` / `GifEncoder(ditherScanOrder:)` parameters.
+  `zigzag` visits pixels along the anti-diagonals, which breaks up the
+  horizontal worm artifacts of raster scanning.
 - Fix binary PNM files being misdetected as TGA, by probing PNM before TGA in
   `findDecoderForData`.
 

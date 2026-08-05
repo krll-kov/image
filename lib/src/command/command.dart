@@ -252,24 +252,37 @@ class Command {
     subCommand = DecodeGifFileCmd(subCommand, path);
   }
 
-  void encodeGif(
-      {int samplingFactor = 10,
-      DitherKernel dither = DitherKernel.floydSteinberg,
-      bool ditherSerpentine = false}) {
+  void encodeGif({
+    int samplingFactor = 10,
+    DitherKernel dither = DitherKernel.floydSteinberg,
+    // Use ditherScanOrder: DitherScanOrder.serpentine instead.
+    bool ditherSerpentine = false,
+    DitherScanOrder? ditherScanOrder,
+  }) {
     subCommand = EncodeGifCmd(subCommand,
         samplingFactor: samplingFactor,
         dither: dither,
-        ditherSerpentine: ditherSerpentine);
+        ditherScanOrder: ditherScanOrder ??
+            (ditherSerpentine
+                ? DitherScanOrder.serpentine
+                : DitherScanOrder.raster));
   }
 
-  void encodeGifFile(String path,
-      {int samplingFactor = 10,
-      DitherKernel dither = DitherKernel.floydSteinberg,
-      bool ditherSerpentine = false}) {
+  void encodeGifFile(
+    String path, {
+    int samplingFactor = 10,
+    DitherKernel dither = DitherKernel.floydSteinberg,
+    // Use ditherScanOrder: DitherScanOrder.serpentine instead.
+    bool ditherSerpentine = false,
+    DitherScanOrder? ditherScanOrder,
+  }) {
     subCommand = EncodeGifFileCmd(subCommand, path,
         samplingFactor: samplingFactor,
         dither: dither,
-        ditherSerpentine: ditherSerpentine);
+        ditherScanOrder: ditherScanOrder ??
+            (ditherSerpentine
+                ? DitherScanOrder.serpentine
+                : DitherScanOrder.raster));
   }
 
   // Ico
@@ -801,12 +814,20 @@ class Command {
         maskChannel: maskChannel);
   }
 
-  void ditherImage(
-      {Quantizer? quantizer,
-      DitherKernel kernel = DitherKernel.floydSteinberg,
-      bool serpentine = false}) {
+  void ditherImage({
+    Quantizer? quantizer,
+    DitherKernel kernel = DitherKernel.floydSteinberg,
+    // Use scanOrder: DitherScanOrder.serpentine instead.
+    bool serpentine = false,
+    DitherScanOrder? scanOrder,
+    double strength = 1.0,
+  }) {
     subCommand = DitherImageCmd(subCommand,
-        quantizer: quantizer, kernel: kernel, serpentine: serpentine);
+        quantizer: quantizer,
+        kernel: kernel,
+        scanOrder: scanOrder ??
+            (serpentine ? DitherScanOrder.serpentine : DitherScanOrder.raster),
+        strength: strength);
   }
 
   void dotScreen(
@@ -946,16 +967,22 @@ class Command {
         size: size, mode: mode, mask: mask, maskChannel: maskChannel);
   }
 
-  void quantize(
-      {int numberOfColors = 256,
-      QuantizeMethod method = QuantizeMethod.neuralNet,
-      DitherKernel dither = DitherKernel.none,
-      bool ditherSerpentine = false}) {
+  void quantize({
+    int numberOfColors = 256,
+    QuantizeMethod method = QuantizeMethod.neuralNet,
+    DitherKernel dither = DitherKernel.none,
+    // Use ditherScanOrder: DitherScanOrder.serpentine instead.
+    bool ditherSerpentine = false,
+    DitherScanOrder? ditherScanOrder,
+  }) {
     subCommand = QuantizeCmd(subCommand,
         numberOfColors: numberOfColors,
         method: method,
         dither: dither,
-        ditherSerpentine: ditherSerpentine);
+        ditherScanOrder: ditherScanOrder ??
+            (ditherSerpentine
+                ? DitherScanOrder.serpentine
+                : DitherScanOrder.raster));
   }
 
   void reinhardTonemap(

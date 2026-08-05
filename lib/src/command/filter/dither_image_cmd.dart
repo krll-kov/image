@@ -5,21 +5,35 @@ import '../command.dart';
 class DitherImageCmd extends Command {
   final Quantizer? quantizer;
   final g.DitherKernel kernel;
+
+  /// Use [scanOrder] instead.
   final bool serpentine;
 
-  DitherImageCmd(Command? input,
-      {this.quantizer,
-      this.kernel = g.DitherKernel.floydSteinberg,
-      this.serpentine = false})
-      : super(input);
+  final g.DitherScanOrder? scanOrder;
+
+  final double strength;
+
+  DitherImageCmd(
+    Command? input, {
+    this.quantizer,
+    this.kernel = g.DitherKernel.floydSteinberg,
+    this.serpentine = false,
+    this.scanOrder,
+    this.strength = 1.0,
+  }) : super(input);
 
   @override
   Future<void> executeCommand() async {
     await input?.execute();
     final img = input?.outputImage;
+    final order = scanOrder ??
+        (serpentine ? g.DitherScanOrder.serpentine : g.DitherScanOrder.raster);
     outputImage = img != null
         ? g.ditherImage(img,
-            quantizer: quantizer, kernel: kernel, serpentine: serpentine)
+            quantizer: quantizer,
+            kernel: kernel,
+            scanOrder: order,
+            strength: strength)
         : null;
   }
 }

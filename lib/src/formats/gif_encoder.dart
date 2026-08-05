@@ -17,22 +17,38 @@ class GifEncoder extends Encoder {
   QuantizerType quantizerType;
   int samplingFactor;
   DitherKernel dither;
+
+  /// Use [ditherScanOrder] instead.
   bool ditherSerpentine;
+
+  /// The order in which pixels are visited by the error-diffusion dither
+  /// kernels. When null, `ditherSerpentine` is used instead.
+  DitherScanOrder? ditherScanOrder;
+
+  /// Scales the dither offset for the Bayer kernels; ignored by the
+  /// error-diffusion kernels.
+  double ditherStrength;
 
   /// The disposal method applied to each frame: 0 = no action,
   /// 1 = do not dispose, 2 = restore to background, 3 = restore to previous.
   int dispose;
 
-  GifEncoder(
-      {this.delay = 80,
-      this.repeat = 0,
-      this.numColors = 256,
-      this.quantizerType = QuantizerType.neural,
-      this.samplingFactor = 10,
-      this.dither = DitherKernel.floydSteinberg,
-      this.ditherSerpentine = false,
-      this.dispose = 2})
-      : _encodedFrames = 0;
+  GifEncoder({
+    this.delay = 80,
+    this.repeat = 0,
+    this.numColors = 256,
+    this.quantizerType = QuantizerType.neural,
+    this.samplingFactor = 10,
+    this.dither = DitherKernel.floydSteinberg,
+    this.ditherSerpentine = false,
+    this.ditherScanOrder,
+    this.ditherStrength = 1.0,
+    this.dispose = 2,
+  }) : _encodedFrames = 0;
+
+  DitherScanOrder get _scanOrder =>
+      ditherScanOrder ??
+      (ditherSerpentine ? DitherScanOrder.serpentine : DitherScanOrder.raster);
 
   /// This adds the frame passed to [image].
   /// After the last frame has been added, [finish] is required to be called.
@@ -54,7 +70,8 @@ class GifEncoder extends Encoder {
         _lastImage = ditherImage(image,
             quantizer: _lastColorMap!,
             kernel: dither,
-            serpentine: ditherSerpentine);
+            scanOrder: _scanOrder,
+            strength: ditherStrength);
       } else {
         _lastImage = image;
       }
@@ -86,9 +103,7 @@ class GifEncoder extends Encoder {
       }
 
       _lastImage = ditherImage(image,
-          quantizer: _lastColorMap!,
-          kernel: dither,
-          serpentine: ditherSerpentine);
+          quantizer: _lastColorMap!, kernel: dither, scanOrder: _scanOrder);
     } else {
       _lastImage = image;
     }
