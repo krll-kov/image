@@ -134,12 +134,22 @@ The **Burkes** kernel is a faster two-row variant of Stucki (divisor 32).
 `scanOrder` controls the order in which pixels are visited by the
 error-diffusion kernels:
 
-- `DitherScanOrder.raster`: every row left to right (the default).
-- `DitherScanOrder.serpentine`: the direction alternates on every other row
-  (same as `serpentine: true`).
-- `DitherScanOrder.zigzag`: diagonal (JPEG-style) scan along the
-  anti-diagonals `x + y == d`, alternating the direction of each diagonal,
-  which breaks up the horizontal worm artifacts of raster scanning.
+- `DitherScanOrder.raster`: standard raster scan — every row is traversed
+  left to right, top to bottom.
+- `DitherScanOrder.serpentine`: boustrophedon (snake) scan — the horizontal
+  direction is reversed on every other row, which reduces directional
+  artifacts (same as `serpentine: true`).
+- `DitherScanOrder.zigzag`: diagonal zigzag scan (the JPEG-style ordering) —
+  pixels are visited along the anti-diagonals `x + y == d`, alternating the
+  direction of each diagonal. It spreads the error along both axes, which
+  softens the horizontal worm patterns typical of raster scanning.
+  **This is the default.**
+- `DitherScanOrder.hilbert`: Hilbert space-filling curve scan — pixels are
+  visited following the fractal Hilbert curve order, which maximizes spatial
+  locality (every pair of consecutive pixels is adjacent on the grid). This
+  gives the best reduction of directional artifacts among deterministic scan
+  orders and closely approximates random-walk error diffusion without
+  sacrificing determinism.
 
 The old `serpentine` boolean is replaced by `scanOrder`; it is ignored when
 `scanOrder` is given explicitly. Neither has an effect on Bayer kernels. The
