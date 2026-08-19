@@ -39,7 +39,7 @@ void main() {
 
     test('set and get pixel', () {
       final image = Image(width: 10, height: 10)
-      ..setPixel(5, 5, ColorRgba8(255, 0, 0, 255));
+        ..setPixel(5, 5, ColorRgba8(255, 0, 0, 255));
       expect(image.getPixel(5, 5).r, equals(255));
       expect(image.getPixel(5, 5).g, equals(0));
       expect(image.getPixel(5, 5).b, equals(0));
@@ -127,8 +127,8 @@ void main() {
   group('Transform', () {
     test('flip horizontal', () {
       final image = Image(width: 4, height: 4)
-      ..setPixel(0, 0, ColorRgba8(255, 0, 0, 255))
-      ..setPixel(3, 0, ColorRgba8(0, 0, 255, 255));
+        ..setPixel(0, 0, ColorRgba8(255, 0, 0, 255))
+        ..setPixel(3, 0, ColorRgba8(0, 0, 255, 255));
 
       final flipped = flipHorizontal(image);
       expect(flipped.getPixel(3, 0).r, equals(255));
@@ -139,8 +139,8 @@ void main() {
 
     test('flip vertical', () {
       final image = Image(width: 4, height: 4)
-      ..setPixel(0, 0, ColorRgba8(255, 0, 0, 255))
-      ..setPixel(0, 3, ColorRgba8(0, 0, 255, 255));
+        ..setPixel(0, 0, ColorRgba8(255, 0, 0, 255))
+        ..setPixel(0, 3, ColorRgba8(0, 0, 255, 255));
 
       final flipped = flipVertical(image);
       expect(flipped.getPixel(0, 3).r, equals(255));
@@ -219,9 +219,7 @@ void main() {
       drawCircle(image,
           x: 10, y: 10, radius: 5, color: ColorRgba8(255, 0, 0, 255));
       try {
-        expect(image
-            .getPixel(10, 10)
-            .r, equals(0));
+        expect(image.getPixel(10, 10).r, equals(0));
       } catch (e) {
         addFailLabel(image, 'drawCircle');
       }
@@ -256,7 +254,7 @@ void main() {
 
     test('invert', () {
       final image = Image(width: 4, height: 4)
-      ..setPixel(0, 0, ColorRgba8(255, 128, 64, 255));
+        ..setPixel(0, 0, ColorRgba8(255, 128, 64, 255));
 
       final inverted = invert(image);
       final p = inverted.getPixel(0, 0);
@@ -268,10 +266,10 @@ void main() {
 
     test('normalize', () {
       final image = Image(width: 2, height: 2)
-      ..setPixel(0, 0, ColorRgba8(0, 0, 0, 255))
-      ..setPixel(1, 0, ColorRgba8(255, 255, 255, 255))
-      ..setPixel(0, 1, ColorRgba8(100, 100, 100, 255))
-      ..setPixel(1, 1, ColorRgba8(200, 200, 200, 255));
+        ..setPixel(0, 0, ColorRgba8(0, 0, 0, 255))
+        ..setPixel(1, 0, ColorRgba8(255, 255, 255, 255))
+        ..setPixel(0, 1, ColorRgba8(100, 100, 100, 255))
+        ..setPixel(1, 1, ColorRgba8(200, 200, 200, 255));
 
       final normalized = normalize(image, min: 0, max: 255);
       expect(normalized.getPixel(0, 0).r, equals(0));

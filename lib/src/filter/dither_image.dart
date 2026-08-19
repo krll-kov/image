@@ -43,7 +43,6 @@ enum DitherScanOrder {
   hilbert,
 }
 
-
 /// Error-diffusion dither kernels keyed by [DitherKernel].
 ///
 /// Each kernel is a list of taps, where every tap is `[weight, offsetX,
@@ -188,9 +187,7 @@ Image ditherImage(
     return ditherImageBayer(image, quantizer, kernel, strength);
   }
 
-  final order = serpentine
-      ? DitherScanOrder.serpentine
-      : scanOrder;
+  final order = serpentine ? DitherScanOrder.serpentine : scanOrder;
 
   final q = quantizer;
   final ds = _errorDiffusionKernels[kernel]!;
@@ -393,4 +390,3 @@ void _hilbertDtoXY(int n, int d, List<int> out) {
     t >>= 2;
   }
 }
-

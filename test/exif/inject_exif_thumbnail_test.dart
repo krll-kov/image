@@ -72,8 +72,7 @@ void main() {
         expect(decoded.thumbnailData, orderedEquals(exif.thumbnailData!));
 
         // The edited tag still round-trips.
-        expect(decoded.imageIfd['DateTime']?.toString(),
-            '2017:12:23 12:39:48');
+        expect(decoded.imageIfd['DateTime']?.toString(), '2017:12:23 12:39:48');
       });
     });
   }
@@ -89,8 +88,8 @@ void main() {
 
     final out = OutputBuffer(bigEndian: true);
     exif.write(out);
-    final reread = ExifData.fromInputBuffer(
-        InputBuffer(out.getBytes(), bigEndian: true));
+    final reread =
+        ExifData.fromInputBuffer(InputBuffer(out.getBytes(), bigEndian: true));
 
     expect(reread.thumbnailData, isNull);
     expect(reread.thumbnailIfd.containsKey(0x0201), isFalse);
