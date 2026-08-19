@@ -180,8 +180,9 @@ class PngDecoder extends Decoder {
           break;
         case 'IDAT':
           _info.idat.add(inputPos);
-          _input.skip(chunkSize);
-          _input.skip(4); // CRC
+          _input
+            ..skip(chunkSize)
+            ..skip(4); // CRC
           break;
         case 'acTL': // Animation control chunk
           _info.numFrames = _input.readUint32();
@@ -215,8 +216,9 @@ class PngDecoder extends Decoder {
           /*int sequenceNumber =*/ _input.readUint32();
           final frame = _info.frames.last as InternalPngFrame;
           frame.fdat.add(inputPos);
-          _input.skip(chunkSize - 4);
-          _input.skip(4); // CRC
+          _input
+            ..skip(chunkSize - 4)
+            ..skip(4); // CRC
           break;
         case 'bKGD':
           if (_info.colorType == PngColorType.indexed) {
@@ -278,8 +280,9 @@ class PngDecoder extends Decoder {
           break;
         default:
           //print('Skipping $chunkType');
-          _input.skip(chunkSize);
-          _input.skip(4); // CRC
+          _input
+            ..skip(chunkSize)
+            ..skip(4); // CRC
           break;
       }
 

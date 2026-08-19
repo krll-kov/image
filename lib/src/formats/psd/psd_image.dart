@@ -558,10 +558,11 @@ class PsdImage implements DecodeInfo {
       si += ns;
       switch (colorMode) {
         case PsdColorMode.rgb:
-          p.r = _ch(channel0!.data, si, ns);
-          p.g = _ch(channel1!.data, si, ns);
-          p.b = _ch(channel2!.data, si, ns);
-          p.a = numChannels >= 4 ? _ch(channel_1!.data, si, ns) : 255;
+          p
+            ..r = _ch(channel0!.data, si, ns)
+            ..g = _ch(channel1!.data, si, ns)
+            ..b = _ch(channel2!.data, si, ns)
+            ..a = numChannels >= 4 ? _ch(channel_1!.data, si, ns) : 255;
 
           if (p.a != 0) {
             // Photoshop/Gimp blend the image against white (argh!),
@@ -579,18 +580,20 @@ class PsdImage implements DecodeInfo {
           final b = _ch(channel2!.data, si, ns) - 128;
           final alpha = numChannels >= 4 ? _ch(channel_1!.data, si, ns) : 255;
           final rgb = labToRgb(L, a, b);
-          p.r = rgb[0];
-          p.g = rgb[1];
-          p.b = rgb[2];
-          p.a = alpha;
+          p
+            ..r = rgb[0]
+            ..g = rgb[1]
+            ..b = rgb[2]
+            ..a = alpha;
           break;
         case PsdColorMode.grayscale:
           final gray = _ch(channel0!.data, si, ns);
           final alpha = numChannels >= 2 ? _ch(channel_1!.data, si, ns) : 255;
-          p.r = gray;
-          p.g = gray;
-          p.b = gray;
-          p.a = alpha;
+          p
+            ..r = gray
+            ..g = gray
+            ..b = gray
+            ..a = alpha;
           break;
         case PsdColorMode.cmyk:
           final c = _ch(channel0!.data, si, ns);
@@ -599,10 +602,11 @@ class PsdImage implements DecodeInfo {
           final k = _ch(channels[numChannels == 4 ? -1 : 3]!.data, si, ns);
           final alpha = numChannels >= 5 ? _ch(channel_1!.data, si, ns) : 255;
           cmykToRgb(255 - c, 255 - m, 255 - y, 255 - k, rgb);
-          p.r = rgb[0];
-          p.g = rgb[1];
-          p.b = rgb[2];
-          p.a = alpha;
+          p
+            ..r = rgb[0]
+            ..g = rgb[1]
+            ..b = rgb[2]
+            ..a = alpha;
           break;
         default:
           throw ImageException('Unhandled color mode: $colorMode');

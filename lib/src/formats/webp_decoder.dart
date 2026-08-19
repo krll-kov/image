@@ -225,14 +225,16 @@ class WebPDecoder extends Decoder {
           }
           break;
         case 'VP8 ':
-          webp!.vp8Position = input.position;
-          webp.vp8Size = size;
-          webp.format = WebPFormat.lossy;
+          webp!
+            ..vp8Position = input.position
+            ..vp8Size = size
+            ..format = WebPFormat.lossy;
           break;
         case 'VP8L':
-          webp!.vp8Position = input.position;
-          webp.vp8Size = size;
-          webp.format = WebPFormat.lossless;
+          webp!
+            ..vp8Position = input.position
+            ..vp8Size = size
+            ..format = WebPFormat.lossless;
           break;
         case 'ALPH':
           webp!.alphaData =

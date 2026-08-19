@@ -143,8 +143,9 @@ class VP8L {
                     ? 2
                     : 3;
         transformSize[0] = _subSampleSize(transform.xsize, bits);
-        transform.bits = bits;
-        transform.data = _decodeImageStream(numColors, 1, false);
+        transform
+          ..bits = bits
+          ..data = _decodeImageStream(numColors, 1, false);
         ok = _expandColorMap(numColors, transform);
         break;
       case VP8LImageTransformType.subtractGreen:
