@@ -151,6 +151,10 @@ class WebPDecoder extends Decoder {
         }
       }
 
+      // Image.from carries the previous frame's duration over, so take this
+      // frame's from the chunk that actually holds it.
+      lastImage.frameDuration = frame.duration;
+
       compositeImage(lastImage, image, dstX: frame.x, dstY: frame.y);
 
       firstImage.addFrame(lastImage);

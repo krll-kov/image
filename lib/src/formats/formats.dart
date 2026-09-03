@@ -460,14 +460,21 @@ Future<Image?> decodeWebPFile(String path, {int? frame}) async {
 }
 
 /// Encode an image to the WebP format (lossless).
-Uint8List encodeWebP(Image image) => WebPEncoder().encode(image);
+///
+/// An image with more than one frame is written as an animation unless
+/// [singleFrame] asks for just the first.
+Uint8List encodeWebP(Image image,
+        {bool singleFrame = false, bool exact = false}) =>
+    WebPEncoder(exact: exact).encode(image, singleFrame: singleFrame);
 
 /// Encode an [image] to a WebP file at the given [path].
-Future<bool> encodeWebPFile(String path, Image image) async {
+Future<bool> encodeWebPFile(String path, Image image,
+    {bool singleFrame = false, bool exact = false}) async {
   if (!supportsFileAccess()) {
     return false;
   }
-  final bytes = WebPEncoder().encode(image);
+  final bytes =
+      WebPEncoder(exact: exact).encode(image, singleFrame: singleFrame);
   return writeFile(path, bytes);
 }
 

@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import '../../exif/exif_data.dart';
+import '../../image/icc_profile.dart';
 import '../../image/image.dart';
 import '../../util/_internal.dart';
 import '../../util/input_buffer.dart';
@@ -74,6 +75,12 @@ class VP8 {
     if (webp.exif.isNotEmpty) {
       final input = InputBuffer(webp.exif.codeUnits);
       output!.exif = ExifData.fromInputBuffer(input);
+    }
+
+    // The ICCP chunk holds the profile uncompressed.
+    final iccp = webp.iccp;
+    if (iccp != null) {
+      output!.iccProfile = IccProfile('', IccProfileCompression.none, iccp);
     }
 
     return output;
