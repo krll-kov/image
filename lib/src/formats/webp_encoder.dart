@@ -10,6 +10,15 @@ import 'webp/webp_container.dart';
 
 /// Encode an image to the WebP format, losslessly or lossily.
 ///
+/// **[lossless] is on by default**, and it makes [quality], [method] and
+/// [alphaQuality] do nothing, so an encoder built with a quality alone will
+/// quietly ignore it:
+///
+/// ```dart
+/// WebPEncoder(quality: 40);                    // still lossless
+/// WebPEncoder(lossless: false, quality: 40);   // lossy, as intended
+/// ```
+///
 /// Lossless uses the VP8L bitstream, lossy the VP8 one, wrapped either way in a
 /// RIFF/WebP container. Animation, an ICC profile and EXIF are carried in the
 /// extended format when the image has them. XMP is not: the decoder reports it
@@ -42,10 +51,34 @@ class WebPEncoder extends Encoder {
 
   /// Between 0 and 100, how much the lossy encoder may discard. Ignored when
   /// [lossless] is set.
+  ///
+  /// The scale belongs to this encoder and does not line up with JPEG's: a
+  /// JPEG at 75 and a WebP at 75 are not the same request, and comparing the
+  /// two formats by their quality numbers says nothing. Compare the size and
+  /// the fidelity they actually produce.
+  ///
+  /// Above about 90 the file grows very steeply for very little. Measured on
+  /// one corpus of screenshots, 90 cost twice the bytes of 75 and 100 cost
+  /// four times, for 3 and 4.5 dB. Below 75 the curve is even: every five
+  /// points takes off about six per cent, with no natural stopping point, so
+  /// how low to go is a judgement about the material rather than a number to
+  /// be found.
   final int quality;
 
   /// How much work the lossy encoder puts into each block, 0 to 6. Ignored
   /// when [lossless] is set.
+  ///
+  /// This trades encoding time against size at a fixed [quality], and the two
+  /// are independent: measured at qualities 40, 60 and 75 the effect was the
+  /// same at each.
+  ///
+  /// - 0 and 1 skip the rate-distortion search entirely: about 20% larger,
+  ///   four times faster. For encoding on demand.
+  /// - 2 and 3 add the search but not the coefficient trellis.
+  /// - 4, the default, is a reasonable middle.
+  /// - 5 and 6 add the trellis on every candidate: about 5% smaller than 4 for
+  ///   twice the time. Worth it for a batch job, where the whole difference is
+  ///   seconds over a run.
   final int method;
 
   /// Between 0 and 100, how exactly the alpha plane is kept. Ignored when

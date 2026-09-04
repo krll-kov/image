@@ -461,10 +461,35 @@ Future<Image?> decodeWebPFile(String path, {int? frame}) async {
 
 /// Encode an image to the WebP format.
 ///
-/// Lossless by default, which reproduces the image exactly. Pass
-/// `lossless: false` for the lossy coding that makes WebP an alternative to
-/// JPEG, where [quality] (0 to 100) says how much may be discarded and
-/// [method] (0 to 6) how hard to look for a good coding.
+/// **Lossless by default**, which reproduces the image exactly. Everything
+/// below except [singleFrame] applies only to the lossy coding, so
+/// `encodeWebP(image, quality: 40)` on its own does nothing at all: pass
+/// `lossless: false` first.
+///
+/// ```dart
+/// // Photographs and screenshots, where WebP replaces JPEG.
+/// encodeWebP(image, lossless: false, quality: 75, method: 6);
+/// ```
+///
+/// [quality] is 0 to 100 and says how much may be discarded. The scale is the
+/// encoder's own and does not line up with JPEG's, so a JPEG at 75 and a WebP
+/// at 75 are not the same request; compare them by the size and fidelity they
+/// actually produce. 75 is the usual choice, and above about 90 the file grows
+/// very steeply for very little: on one corpus of screenshots, 90 was twice
+/// the bytes of 75 and 100 was four times, for 3 and 4.5 dB.
+///
+/// [method] is 0 to 6 and says how hard to look for a good coding. It trades
+/// encoding time against size at a fixed quality, and the two settings are
+/// independent: measured across qualities 40, 60 and 75 the effect was the
+/// same at each, roughly
+///
+/// - 0 to 1: about 20% larger, four times faster. For encoding on demand.
+/// - 4 (the default): a reasonable middle.
+/// - 6: about 5% smaller, twice the time. Worth it for a batch job, where the
+///   difference is seconds over a whole run.
+///
+/// [alphaQuality] and [exact] only do anything when the image has
+/// transparency; see [WebPEncoder] for what they mean.
 ///
 /// An image with more than one frame is written as an animation unless
 /// [singleFrame] asks for just the first.
@@ -484,6 +509,9 @@ Uint8List encodeWebP(Image image,
         .encode(image, singleFrame: singleFrame);
 
 /// Encode an [image] to a WebP file at the given [path].
+///
+/// The options are [encodeWebP]'s; note that it is lossless by default, so
+/// [quality] and [method] do nothing without `lossless: false`.
 Future<bool> encodeWebPFile(String path, Image image,
     {bool singleFrame = false,
     bool exact = false,
