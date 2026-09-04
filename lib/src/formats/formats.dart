@@ -459,22 +459,48 @@ Future<Image?> decodeWebPFile(String path, {int? frame}) async {
   return WebPDecoder().decode(bytes, frame: frame);
 }
 
-/// Encode an image to the WebP format (lossless).
+/// Encode an image to the WebP format.
+///
+/// Lossless by default, which reproduces the image exactly. Pass
+/// `lossless: false` for the lossy coding that makes WebP an alternative to
+/// JPEG, where [quality] (0 to 100) says how much may be discarded and
+/// [method] (0 to 6) how hard to look for a good coding.
 ///
 /// An image with more than one frame is written as an animation unless
 /// [singleFrame] asks for just the first.
 Uint8List encodeWebP(Image image,
-        {bool singleFrame = false, bool exact = false}) =>
-    WebPEncoder(exact: exact).encode(image, singleFrame: singleFrame);
+        {bool singleFrame = false,
+        bool exact = false,
+        bool lossless = true,
+        int quality = 75,
+        int method = 4,
+        int alphaQuality = 100}) =>
+    WebPEncoder(
+            exact: exact,
+            lossless: lossless,
+            quality: quality,
+            method: method,
+            alphaQuality: alphaQuality)
+        .encode(image, singleFrame: singleFrame);
 
 /// Encode an [image] to a WebP file at the given [path].
 Future<bool> encodeWebPFile(String path, Image image,
-    {bool singleFrame = false, bool exact = false}) async {
+    {bool singleFrame = false,
+    bool exact = false,
+    bool lossless = true,
+    int quality = 75,
+    int method = 4,
+    int alphaQuality = 100}) async {
   if (!supportsFileAccess()) {
     return false;
   }
-  final bytes =
-      WebPEncoder(exact: exact).encode(image, singleFrame: singleFrame);
+  final bytes = WebPEncoder(
+          exact: exact,
+          lossless: lossless,
+          quality: quality,
+          method: method,
+          alphaQuality: alphaQuality)
+      .encode(image, singleFrame: singleFrame);
   return writeFile(path, bytes);
 }
 

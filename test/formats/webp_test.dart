@@ -1,8 +1,17 @@
+// The alphaQuality test passes the default value explicitly: what that
+// default does is the thing under test.
+// ignore_for_file: avoid_redundant_argument_values
+
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:image/image.dart';
+import 'package:image/src/formats/webp/vp8_config.dart';
+import 'package:image/src/formats/webp/vp8_rd.dart';
+import 'package:image/src/formats/webp/vp8_sar.dart';
+import 'package:image/src/formats/webp/vp8_state.dart';
+import 'package:image/src/formats/webp/vp8_yuv.dart';
 import 'package:image/src/formats/webp/vp8l_analysis.dart';
 import 'package:image/src/formats/webp/vp8l_encoder.dart';
 import 'package:image/src/formats/webp/vp8l_predictor.dart';
@@ -899,6 +908,251 @@ void main() {
           final encoded = encodeWebP(original);
           expect(
               encoded.length, lessThan(original.width * original.height ~/ 2));
+        });
+      });
+
+      group('encode lossy', () {
+        /// A picture with smooth areas, an edge and some texture, which is
+        /// enough to exercise every prediction mode.
+        Image scene(int w, int h, {bool alpha = false}) {
+          final image = Image(width: w, height: h, numChannels: alpha ? 4 : 3);
+          var seed = 3;
+          for (var y = 0; y < h; y++) {
+            for (var x = 0; x < w; x++) {
+              seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+              final noise = (seed >> 16) & 7;
+              final edge = x > w ~/ 2 ? 60 : 0;
+              image.getPixel(x, y)
+                ..r = (x * 255 ~/ w + edge + noise).clamp(0, 255)
+                ..g = (y * 255 ~/ h + noise).clamp(0, 255)
+                ..b = (128 - edge + noise).clamp(0, 255);
+              if (alpha) {
+                // A hard-edged transparent corner, which is where the alpha
+                // plane and the colour under it are most likely to go wrong.
+                image.getPixel(x, y).a = (x < w ~/ 3 && y < h ~/ 3) ? 0 : 255;
+              }
+            }
+          }
+          return image;
+        }
+
+        double psnr(Image a, Image b, {bool visibleOnly = false}) {
+          var sse = 0.0;
+          var count = 0;
+          for (var y = 0; y < a.height; y++) {
+            for (var x = 0; x < a.width; x++) {
+              final p = a.getPixel(x, y);
+              final q = b.getPixel(x, y);
+              if (visibleOnly && p.a == 0) {
+                continue;
+              }
+              for (final d in [p.r - q.r, p.g - q.g, p.b - q.b]) {
+                sse += d * d;
+                count++;
+              }
+            }
+          }
+          if (sse == 0) {
+            return 99;
+          }
+          return 10 * (log(255 * 255 * count / sse) / ln10);
+        }
+
+        test('round-trips close to the source', () {
+          final source = scene(96, 64);
+          final bytes = encodeWebP(source, lossless: false);
+          final decoded = decodeWebP(bytes);
+          expect(decoded, isNotNull);
+          expect(decoded!.width, equals(96));
+          expect(decoded.height, equals(64));
+          // Lossy, so not pixel for pixel, but nothing like a different image.
+          expect(psnr(source, decoded), greaterThan(30));
+        });
+
+        test('is a lossy VP8 bitstream, not a lossless one', () {
+          final bytes = encodeWebP(scene(64, 64), lossless: false);
+          expect(String.fromCharCodes(bytes.sublist(12, 16)), equals('VP8 '));
+          expect(bytes.length, lessThan(encodeWebP(scene(64, 64)).length));
+        });
+
+        test('quality trades size against fidelity', () {
+          final source = scene(128, 96);
+          final low = encodeWebP(source, lossless: false, quality: 20);
+          final high = encodeWebP(source, lossless: false, quality: 95);
+          expect(low.length, lessThan(high.length));
+          expect(psnr(source, decodeWebP(low)!),
+              lessThan(psnr(source, decodeWebP(high)!)));
+        });
+
+        test('every effort level codes a valid stream', () {
+          // The trellis only runs at the two highest levels, and the fast
+          // levels take a different path through the mode search entirely, so
+          // nothing below exercises them.
+          final source = scene(64, 48);
+          for (var method = 0; method <= 6; method++) {
+            final bytes = encodeWebP(source, lossless: false, method: method);
+            final decoded = decodeWebP(bytes);
+            expect(decoded, isNotNull, reason: 'method $method');
+            expect(psnr(source, decoded!), greaterThan(30),
+                reason: 'method $method');
+          }
+        });
+
+        test('diffuses the chroma DC error below quality 98', () {
+          // Banding is what this is for: on a smooth ramp every block rounds
+          // its chroma DC the same way and the result is a staircase, so the
+          // leftover is spread into the neighbours instead. It is off at the
+          // top of the quality range, where there is nothing to spread.
+          Image ramp(int w, int h) {
+            final image = Image(width: w, height: h);
+            for (var y = 0; y < h; y++) {
+              for (var x = 0; x < w; x++) {
+                image.getPixel(x, y)
+                  ..r = 128 + x * 32 ~/ w
+                  ..g = 128
+                  ..b = 128 - x * 16 ~/ w;
+              }
+            }
+            return image;
+          }
+
+          final yuv = importYuv(ramp(16, 16));
+          expect(VP8EncState(VP8Config(quality: 98), yuv).topDerr, isNotNull,
+              reason: 'diffusion is on at the threshold');
+          expect(VP8EncState(VP8Config(quality: 99), yuv).topDerr, isNull,
+              reason: 'and off above it');
+
+          final source = ramp(128, 64);
+          for (final quality in [10, 50, 98, 99]) {
+            final bytes = encodeWebP(source, lossless: false, quality: quality);
+            final decoded = decodeWebP(bytes);
+            expect(decoded, isNotNull, reason: 'quality $quality');
+            expect(psnr(source, decoded!), greaterThan(30),
+                reason: 'quality $quality');
+          }
+
+          // The error travels between macroblocks, so it has to survive a
+          // picture that is not a whole number of them in either direction.
+          expect(
+              decodeWebP(encodeWebP(ramp(37, 21), lossless: false)), isNotNull);
+        });
+
+        test('alphaQuality reduces the alpha plane, and 100 keeps it', () {
+          // A radial falloff, as in a real soft mask: a linear ramp is what
+          // the horizontal filter predicts perfectly, so its alpha plane is
+          // already almost free and there is nothing for this to save.
+          const size = 128;
+          final source = Image(width: size, height: size, numChannels: 4);
+          for (var y = 0; y < size; y++) {
+            for (var x = 0; x < size; x++) {
+              final dx = (x - size / 2) / (size / 2);
+              final dy = (y - size / 2) / (size / 2);
+              final r = sqrt(dx * dx + dy * dy);
+              source.getPixel(x, y)
+                ..r = 40 + x
+                ..g = 90
+                ..b = 200 - y
+                ..a = (255 * (1 - r).clamp(0.0, 1.0)).round();
+            }
+          }
+          int levels(Image image) {
+            final seen = <int>{};
+            for (final p in image) {
+              seen.add(p.a.toInt());
+            }
+            return seen.length;
+          }
+
+          // The default keeps every level, whatever the lossy quality is.
+          final exact = decodeWebP(encodeWebP(source,
+              lossless: false, quality: 40, alphaQuality: 100))!;
+          for (var y = 0; y < size; y++) {
+            for (var x = 0; x < size; x++) {
+              expect(exact.getPixel(x, y).a, equals(source.getPixel(x, y).a),
+                  reason: 'alpha at $x,$y');
+            }
+          }
+
+          // Lower settings quantize it, to libwebp's mapping: quality 70 is
+          // sixteen levels, and below that fewer.
+          final reduced = decodeWebP(
+              encodeWebP(source, lossless: false, alphaQuality: 70))!;
+          expect(levels(reduced), equals(16));
+          expect(
+              levels(decodeWebP(
+                  encodeWebP(source, lossless: false, alphaQuality: 20))!),
+              lessThan(16));
+
+          // Which is the point: fewer levels, smaller plane, monotonically.
+          final atFull =
+              encodeWebP(source, lossless: false, alphaQuality: 100).length;
+          final atSeventy =
+              encodeWebP(source, lossless: false, alphaQuality: 70).length;
+          final atTwenty =
+              encodeWebP(source, lossless: false, alphaQuality: 20).length;
+          expect(atSeventy, lessThan(atFull));
+          expect(atTwenty, lessThan(atSeventy));
+        });
+
+        test('the arithmetic the encoder relies on is web-safe', () {
+          // A Dart int is a double on the web, `<<` is a 32-bit shift there,
+          // and `>>` returns its result *unsigned*, so `-5 >> 1` is 4294967293
+          // rather than -3. The transforms shift signed intermediates on every
+          // block, and getting this wrong once cost 26 dB without failing a
+          // single test: the VM was fine and nothing here ran the web build.
+          //
+          // These check the two invariants the encoder depends on. They pass
+          // trivially on the VM; their value is that `dart test -p chrome`, or
+          // any web CI, runs them too.
+          expect(maxCost, greaterThan(1 << 30),
+              reason: 'the score ceiling must not collapse to a small value');
+          expect(maxCost, equals(1125899906842624));
+          for (final v in [-5, -1, -7, -8, -9, -20091000, -1812, 5, 0]) {
+            for (final n in [1, 2, 3, 9, 16]) {
+              expect(sar(v, n), equals((v / (1 << n)).floor()),
+                  reason: 'sar($v, $n) must be an arithmetic shift');
+            }
+          }
+        });
+
+        test('keeps the alpha channel exactly', () {
+          final source = scene(80, 48, alpha: true);
+          final bytes = encodeWebP(source, lossless: false);
+          // Transparency cannot ride in the VP8 bitstream, so it needs the
+          // extended container and its own chunk.
+          expect(String.fromCharCodes(bytes.sublist(12, 16)), equals('VP8X'));
+          final decoded = decodeWebP(bytes)!;
+          for (var y = 0; y < source.height; y++) {
+            for (var x = 0; x < source.width; x++) {
+              expect(decoded.getPixel(x, y).a, equals(source.getPixel(x, y).a),
+                  reason: 'alpha at ($x,$y)');
+            }
+          }
+          expect(psnr(source, decoded, visibleOnly: true), greaterThan(30));
+        });
+
+        test('handles sizes that are not whole macroblocks', () {
+          for (final size in [
+            [1, 1],
+            [1, 17],
+            [17, 1],
+            [15, 15],
+            [17, 33],
+            [64, 3]
+          ]) {
+            final source = scene(size[0], size[1]);
+            final decoded = decodeWebP(encodeWebP(source, lossless: false));
+            expect(decoded, isNotNull, reason: '${size[0]}x${size[1]}');
+            expect(decoded!.width, equals(size[0]));
+            expect(decoded.height, equals(size[1]));
+          }
+        });
+
+        test('refuses an image the format cannot describe', () {
+          expect(
+              () => encodeWebP(Image(width: maxDimension + 1, height: 2),
+                  lossless: false),
+              throwsA(isA<ImageException>()));
         });
       });
 

@@ -10,6 +10,7 @@ class VP8LBitWriter {
   int _currentByte = 0;
   int _usedBits = 0;
 
+  @pragma('vm:unsafe:no-bounds-checks')
   void writeBits(int value, int numBits) {
     while (numBits > 0) {
       final available = 8 - _usedBits;

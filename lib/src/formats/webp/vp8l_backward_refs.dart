@@ -85,6 +85,7 @@ class VP8LMatches {
 /// search then covers a whole run, which is most of what makes such images
 /// cheap to encode. libwebp does the same in `VP8LHashChainFill`.
 @internal
+@pragma('vm:unsafe:no-bounds-checks')
 VP8LMatches computeMatches(Uint8List r, Uint8List g, Uint8List b, Uint8List a,
     int numPixels, int width) {
   final lz = _Lz77(r, g, b, a, numPixels)..fillChain();
@@ -241,7 +242,7 @@ class _Lz77 {
     while ((1 << hashBits) < _numPixels && hashBits < 18) {
       hashBits++;
     }
-    _shift = 64 - hashBits;
+    _shift = 32 - hashBits;
     _head = Int32List(1 << hashBits)..fillRange(0, 1 << hashBits, -1);
 
     // Pixels packed one word each, so matching compares a single value per
@@ -262,9 +263,17 @@ class _Lz77 {
   int matchLen = 0;
   int matchDist = 0;
 
+  /// libwebp's own pair hash, kept in 32-bit arithmetic.
+  ///
+  /// A 64-bit multiply would be the obvious way to mix two pixels, but on the
+  /// web an int is a double: only the low 53 bits of a product survive, and a
+  /// 64-bit constant is not even expressible. Two 32-bit multiplies say the
+  /// same thing on every platform.
   @pragma('vm:prefer-inline')
-  int _hash(int high, int low) =>
-      (((high << 32) | low) * 0x9e3779b97f4a7c15) >>> _shift;
+  int _hash(int first, int second) =>
+      ((_mul32(second, 0xc6a4a793) + _mul32(first, 0x5bd1e996)) &
+          0xffffffff) >>>
+      _shift;
 
   /// Links every position to the previous one that hashes the same.
   ///
@@ -280,6 +289,7 @@ class _Lz77 {
   /// distance code there is — on its first step. Spreading the run replaces
   /// that with distant candidates. libwebp can afford it because it tries an
   /// RLE pass as a separate strategy.
+  @pragma('vm:unsafe:no-bounds-checks')
   void fillChain() {
     final n = _numPixels;
     if (n <= 2) {
@@ -298,6 +308,7 @@ class _Lz77 {
   }
 
   /// Longest match reaching back from [at], left in [matchLen]/[matchDist].
+  @pragma('vm:unsafe:no-bounds-checks')
   void findMatch(int at) {
     matchLen = 0;
     matchDist = 0;
@@ -451,4 +462,13 @@ class VP8LCostModel {
   double literalCost(
           Uint8List r, Uint8List g, Uint8List b, Uint8List a, int i) =>
       _green[g[i]] + _red[r[i]] + _blue[b[i]] + _alpha[a[i]];
+}
+
+/// The low 32 bits of `a * b`, computed so that no intermediate exceeds the 53
+/// bits an int is exact to on the web.
+@pragma('vm:prefer-inline')
+int _mul32(int a, int b) {
+  final lo = (a & 0xffff) * b;
+  final hi = ((a >>> 16) * b) & 0xffff;
+  return (lo + hi * 0x10000) & 0xffffffff;
 }

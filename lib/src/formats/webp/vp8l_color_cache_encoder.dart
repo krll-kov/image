@@ -59,6 +59,7 @@ int selectColorCacheBits(
 
 /// Replays the token stream while maintaining the decoder's color cache, and
 /// records for each literal the key that would reproduce it, or -1.
+@pragma('vm:unsafe:no-bounds-checks')
 void _walkColorCache(
     Uint8List r,
     Uint8List g,
@@ -110,6 +111,7 @@ void _walkColorCache(
 /// Approximate coded size of the token stream in bits for one cache
 /// configuration. Extra bits for lengths and distances are the same for every
 /// configuration and are left out.
+@pragma('vm:unsafe:no-bounds-checks')
 double _estimateCost(
     Uint8List r,
     Uint8List g,

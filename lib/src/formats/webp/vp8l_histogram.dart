@@ -29,6 +29,8 @@ final Float64List _logOfInt = () {
 const _logTableSize = 4096;
 
 @pragma('vm:prefer-inline')
+@pragma('vm:unsafe:no-bounds-checks')
+@pragma('vm:unsafe:no-interrupts')
 double _logInt(int n) =>
     n < _logTableSize ? _logOfInt[n] : math.log(n.toDouble());
 
@@ -109,6 +111,7 @@ class VP8LHistogram {
   /// terms of the entropy are kept as running sums, so only the symbols the
   /// block actually touches have to be revisited, rather than the whole
   /// alphabet.
+  @pragma('vm:unsafe:no-bounds-checks')
   double mergedCostWith(VP8LHistogram other) {
     _ensureStats();
     other._ensureStats();

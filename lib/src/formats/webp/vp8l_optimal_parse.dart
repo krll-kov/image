@@ -33,6 +33,7 @@ const _lengthsWeighed = 16;
 ///
 /// Positions inside a token hold 0 and are never read.
 @internal
+@pragma('vm:unsafe:no-bounds-checks')
 Int32List optimalCover(
     VP8LMatches matches,
     VP8LCostModel costs,

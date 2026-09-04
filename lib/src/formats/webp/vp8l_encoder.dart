@@ -50,16 +50,6 @@ class VP8LEncoder {
           '${maxDimension}x$maxDimension, got ${width}x$height');
     }
 
-    final out = OutputBuffer();
-
-    // 16x16 predictor blocks, which is what libwebp settles on at its highest
-    // effort (GetTransformBits caps the transform at 4 bits there). Measured
-    // against 32x32 on both a screenshot corpus and the test images, it codes
-    // about 0.75% smaller for the same time.
-    const predSizeBits = 4;
-    const predBlockSize = 1 << predSizeBits;
-    final predBlockW = (width + predBlockSize - 1) ~/ predBlockSize;
-    final predBlockH = (height + predBlockSize - 1) ~/ predBlockSize;
     final numPixels = width * height;
     final g = Uint8List(numPixels);
     final r = Uint8List(numPixels);
@@ -87,12 +77,34 @@ class VP8LEncoder {
     // whether it has an alpha channel, which is what libwebp records too.
     final header =
         (width - 1) | ((height - 1) << 14) | ((alphaIsUsed ? 1 : 0) << 28);
-    out
+    final out = OutputBuffer()
       ..writeByte(0x2f)
       ..writeByte(header & 0xff)
       ..writeByte((header >> 8) & 0xff)
       ..writeByte((header >> 16) & 0xff)
-      ..writeByte((header >> 24) & 0xff);
+      ..writeByte((header >> 24) & 0xff)
+      ..writeBytes(
+          encodeStream(r, g, b, a, width, height, alphaIsUsed: alphaIsUsed));
+    return out.getBytes();
+  }
+
+  /// Encodes four colour planes as a bare VP8L stream, with no image header.
+  ///
+  /// The alpha channel of a lossy file is carried this way: it is a VP8L image
+  /// in its own right, but its size is already known from the frame, so the
+  /// header would only repeat it.
+  Uint8List encodeStream(
+      Uint8List r, Uint8List g, Uint8List b, Uint8List a, int width, int height,
+      {required bool alphaIsUsed}) {
+    // 16x16 predictor blocks, which is what libwebp settles on at its highest
+    // effort (GetTransformBits caps the transform at 4 bits there). Measured
+    // against 32x32 on both a screenshot corpus and the test images, it codes
+    // about 0.75% smaller for the same time.
+    const predSizeBits = 4;
+    const predBlockSize = 1 << predSizeBits;
+    final predBlockW = (width + predBlockSize - 1) ~/ predBlockSize;
+    final predBlockH = (height + predBlockSize - 1) ~/ predBlockSize;
+    final numPixels = width * height;
 
     // Pack once here: the predictors are written on a packed ARGB word, the
     // transform analysis wants the pixels as they came in, and flattening the
@@ -122,8 +134,7 @@ class VP8LEncoder {
       final bw = VP8LBitWriter();
       _writePaletteImage(bw, palette, r, g, b, a, width, height);
       bw.flush();
-      out.writeBytes(bw.getBytes());
-      return out.getBytes();
+      return bw.getBytes();
     }
 
     // Which transforms are worth carrying is decided from one pass over the
@@ -187,9 +198,7 @@ class VP8LEncoder {
 
     _writeImageStream(bw, r, g, b, a, width, numPixels, isLevel0: true);
     bw.flush();
-
-    out.writeBytes(bw.getBytes());
-    return out.getBytes();
+    return bw.getBytes();
   }
 
   /// Writes a VP8L image stream: the color cache flag, the meta Huffman flag,

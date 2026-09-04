@@ -123,6 +123,8 @@ int predict(int mode, int left, int top, int topLeft, int topRight) {
 /// one at a time re-derives the shared averages fourteen times over; here each
 /// is computed once.
 @internal
+@pragma('vm:unsafe:no-bounds-checks')
+@pragma('vm:unsafe:no-interrupts')
 void predictAll(int left, int top, int topLeft, int topRight, Uint32List out) {
   final avgLeftTopLeft = _avg2(left, topLeft);
   final avgTopTopRight = _avg2(top, topRight);
@@ -147,6 +149,8 @@ void predictAll(int left, int top, int topLeft, int topRight, Uint32List out) {
 ///
 /// A residual wraps, so a channel differing by 200 is really off by 56 and
 /// costs what 56 costs.
+@pragma('vm:unsafe:no-bounds-checks')
+@pragma('vm:unsafe:no-interrupts')
 int _residualMagnitude(int v, int p) {
   var d = ((v >> 24) - (p >> 24)) & 0xff;
   var cost = d < 128 ? d : 256 - d;
@@ -161,6 +165,7 @@ int _residualMagnitude(int v, int p) {
 /// Picks a predictor for each block, minimising the summed magnitude of the
 /// residuals it leaves behind.
 @internal
+@pragma('vm:unsafe:no-bounds-checks')
 List<int> selectPredictorModes(
   Uint32List argb,
   int width,

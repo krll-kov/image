@@ -91,7 +91,7 @@ Uint8List anmfChunkData(
     required int height,
     required int duration,
     required bool clearToBackground,
-    required Uint8List bitstream}) {
+    required List<WebPChunk> frame}) {
   final out = OutputBuffer();
   // The offsets are stored halved, so they are always even.
   _writeUint24(out, x >> 1);
@@ -99,13 +99,11 @@ Uint8List anmfChunkData(
   _writeUint24(out, width - 1);
   _writeUint24(out, height - 1);
   _writeUint24(out, duration);
-  out
-    ..writeByte(clearToBackground ? 1 : 0)
-    ..writeBytes(webPTag('VP8L'))
-    ..writeUint32(bitstream.length)
-    ..writeBytes(bitstream);
-  if (bitstream.length.isOdd) {
-    out.writeByte(0);
+  out.writeByte(clearToBackground ? 1 : 0);
+  // The frame's own chunks follow: its bitstream, preceded by the alpha plane
+  // when the bitstream is lossy and carries none of its own.
+  for (final chunk in frame) {
+    chunk.writeTo(out);
   }
   return out.getBytes();
 }

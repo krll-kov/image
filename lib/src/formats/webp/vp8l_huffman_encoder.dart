@@ -67,6 +67,8 @@ int prefixCode(int v) {
   return (eb, val - base);
 }
 
+@pragma('vm:unsafe:no-bounds-checks')
+@pragma('vm:unsafe:no-interrupts')
 int _log2Floor(int v) {
   var log = 0;
   while (v > 1) {
@@ -171,6 +173,7 @@ List<int> buildHuffmanCodeLengths(
 
 /// Write a Huffman code definition in VP8L format.
 @internal
+@pragma('vm:unsafe:no-bounds-checks')
 void writeHuffmanCode(
   VP8LBitWriter bw,
   int alphabetSize,
