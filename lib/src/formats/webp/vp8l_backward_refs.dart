@@ -10,26 +10,48 @@ import 'vp8l_huffman_encoder.dart' as huffman;
 
 /// The token stream for one image: literals and back-references in the order
 /// they are coded, plus where in the image each one starts.
+///
+/// Typed arrays: a literal-heavy image has a token per pixel, and a growable
+/// `List<int>` that long costs eight bytes an element plus doubling slack.
 @internal
 class VP8LBackwardRefs {
   VP8LBackwardRefs(this.isLiteral, this.literalIndex, this.length,
       this.distance, this.position);
 
-  /// One entry per token: whether it is a literal or a back-reference.
-  final List<bool> isLiteral;
+  /// One entry per token: nonzero if it is a literal.
+  final Uint8List isLiteral;
 
   /// Pixel index of each literal, in literal order.
-  final List<int> literalIndex;
+  final Int32List literalIndex;
 
   /// Match length of each back-reference, in back-reference order.
-  final List<int> length;
+  final Int32List length;
 
   /// Match distance of each back-reference, in back-reference order.
-  final List<int> distance;
+  final Int32List distance;
 
   /// Pixel index each token starts at, in token order. Meta Huffman uses this
   /// to decide which group of codes a token belongs to.
   final Int32List position;
+}
+
+/// A parse of the image: how many pixels the token starting at each position
+/// covers, and at what distance. Positions inside a token are never read.
+///
+/// The two arrays are sized together so a caller cannot mismatch them. The
+/// code that fills them runs without bounds checks.
+@internal
+class VP8LCover {
+  VP8LCover(this.numPixels)
+      : cover = Int32List(numPixels),
+        distance = Int32List(numPixels);
+
+  /// Length of both arrays. Nothing that reads them checks bounds, so a second
+  /// length kept alongside corrupts memory instead of throwing.
+  final int numPixels;
+
+  final Int32List cover;
+  final Int32List distance;
 }
 
 /// How far back the chain of candidate positions is followed.
@@ -88,6 +110,13 @@ class VP8LMatches {
 @pragma('vm:unsafe:no-bounds-checks')
 VP8LMatches computeMatches(Uint8List r, Uint8List g, Uint8List b, Uint8List a,
     int numPixels, int width) {
+  // Bounds checks are off here, so the lengths are the contract.
+  if (r.length < numPixels ||
+      g.length < numPixels ||
+      b.length < numPixels ||
+      a.length < numPixels) {
+    throw ArgumentError('computeMatches needs $numPixels of every plane');
+  }
   final lz = _Lz77(r, g, b, a, numPixels)..fillChain();
   final px = lz._px;
   final prev = lz._prev;
@@ -207,30 +236,48 @@ VP8LMatches computeMatches(Uint8List r, Uint8List g, Uint8List b, Uint8List a,
 /// A cover of 1 is a literal; anything longer is a back-reference at the
 /// distance the parse chose for that position.
 @internal
-VP8LBackwardRefs refsFromCover(
-    Int32List cover, Int32List coverDistance, int numPixels) {
-  final isLiteral = <bool>[];
-  final literalIndex = <int>[];
-  final length = <int>[];
-  final distance = <int>[];
-  final positions = <int>[];
-  var i = 0;
-  while (i < numPixels) {
+VP8LBackwardRefs refsFromCover(VP8LCover parse) {
+  final numPixels = parse.numPixels;
+  final cover = parse.cover;
+  final coverDistance = parse.distance;
+
+  // Counted first so every array is allocated at its final size.
+  var numTokens = 0;
+  var numLiterals = 0;
+  for (var i = 0; i < numPixels;) {
     final n = cover[i];
-    positions.add(i);
+    numTokens++;
     if (n <= 1) {
-      isLiteral.add(true);
-      literalIndex.add(i);
+      numLiterals++;
       i++;
     } else {
-      isLiteral.add(false);
-      length.add(n);
-      distance.add(coverDistance[i]);
       i += n;
     }
   }
-  return VP8LBackwardRefs(
-      isLiteral, literalIndex, length, distance, Int32List.fromList(positions));
+
+  final isLiteral = Uint8List(numTokens);
+  final literalIndex = Int32List(numLiterals);
+  final length = Int32List(numTokens - numLiterals);
+  final distance = Int32List(numTokens - numLiterals);
+  final positions = Int32List(numTokens);
+  var t = 0;
+  var lit = 0;
+  var ref = 0;
+  for (var i = 0; i < numPixels;) {
+    final n = cover[i];
+    positions[t] = i;
+    if (n <= 1) {
+      isLiteral[t] = 1;
+      literalIndex[lit++] = i;
+      i++;
+    } else {
+      length[ref] = n;
+      distance[ref++] = coverDistance[i];
+      i += n;
+    }
+    t++;
+  }
+  return VP8LBackwardRefs(isLiteral, literalIndex, length, distance, positions);
 }
 
 /// The hash chain the match search walks.
@@ -384,21 +431,17 @@ class VP8LCostModel {
   ///
   /// Reading the cover rather than a built token stream keeps the first pass
   /// from materialising a list per token field only to throw it away.
-  factory VP8LCostModel.fromCover(
-      Int32List cover,
-      Int32List coverDistance,
-      Uint8List r,
-      Uint8List g,
-      Uint8List b,
-      Uint8List a,
-      int numPixels,
-      int width) {
+  factory VP8LCostModel.fromCover(VP8LCover parse, Uint8List r, Uint8List g,
+      Uint8List b, Uint8List a, int width) {
     final green = Float64List(280);
     final red = Float64List(256);
     final blue = Float64List(256);
     final alpha = Float64List(256);
     final dist = Float64List(40);
 
+    final numPixels = parse.numPixels;
+    final cover = parse.cover;
+    final coverDistance = parse.distance;
     var i = 0;
     while (i < numPixels) {
       final n = cover[i];

@@ -28,22 +28,29 @@ const _minMatchLen = 3;
 /// the longest match at every pixel: measured at 48 it buys 0.01% over 16.
 const _lengthsWeighed = 16;
 
-/// The cheapest cover of the image, as the number of pixels the token starting
-/// at each position spans.
+/// Writes into [parse] the cheapest cover of the image, as the number of pixels
+/// the token starting at each position spans.
 ///
-/// Positions inside a token hold 0 and are never read.
+/// Positions inside a token are left as they were and never read, so [parse]
+/// may arrive holding an earlier cover.
 @internal
 @pragma('vm:unsafe:no-bounds-checks')
-Int32List optimalCover(
-    VP8LMatches matches,
-    VP8LCostModel costs,
-    Uint8List r,
-    Uint8List g,
-    Uint8List b,
-    Uint8List a,
-    int numPixels,
-    int width,
-    Int32List coverDistance) {
+void optimalCover(VP8LMatches matches, VP8LCostModel costs, Uint8List r,
+    Uint8List g, Uint8List b, Uint8List a, int width, VP8LCover parse) {
+  final numPixels = parse.numPixels;
+  final cover = parse.cover;
+  final coverDistance = parse.distance;
+
+  // Bounds checks are off here, so the lengths are the contract.
+  if (r.length < numPixels ||
+      g.length < numPixels ||
+      b.length < numPixels ||
+      a.length < numPixels ||
+      matches.length.length < numPixels ||
+      matches.distance.length < numPixels) {
+    throw ArgumentError('optimalCover needs $numPixels of every array');
+  }
+
   // cost[i] is the cheapest way to code the first i pixels; from[i] is how many
   // pixels the last token of that way covers.
   final cost = Float64List(numPixels + 1)
@@ -116,7 +123,6 @@ Int32List optimalCover(
 
   // Walk the predecessors back, then turn the chain around so that each token
   // is recorded at the position it starts from.
-  final cover = Int32List(numPixels);
   var at = numPixels;
   while (at > 0) {
     final len = from[at];
@@ -124,5 +130,4 @@ Int32List optimalCover(
     coverDistance[at - len] = fromDistance[at];
     at -= len;
   }
-  return cover;
 }

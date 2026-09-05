@@ -13,7 +13,9 @@ import 'package:image/src/formats/webp/vp8_sar.dart';
 import 'package:image/src/formats/webp/vp8_state.dart';
 import 'package:image/src/formats/webp/vp8_yuv.dart';
 import 'package:image/src/formats/webp/vp8l_analysis.dart';
+import 'package:image/src/formats/webp/vp8l_backward_refs.dart';
 import 'package:image/src/formats/webp/vp8l_encoder.dart';
+import 'package:image/src/formats/webp/vp8l_optimal_parse.dart';
 import 'package:image/src/formats/webp/vp8l_predictor.dart';
 import 'package:test/test.dart';
 
@@ -1187,6 +1189,85 @@ void main() {
                   throwsA(isA<ImageException>()),
                   reason: '${size[0]}x${size[1]} lossless=$lossless');
             }
+          }
+        });
+      });
+
+      group('token stream', () {
+        // The greedy cover is priced, then overwritten in place by the optimal
+        // one, so the two share their arrays. That only holds because the
+        // optimal parse writes every position the token stream is later read
+        // back from. Break it and the encoder still emits a valid file, just a
+        // worse one built partly from the discarded parse, which no round-trip
+        // can see.
+        test('the optimal parse writes every position that is read back', () {
+          for (final size in const [
+            [1, 1],
+            [3, 3],
+            [16, 1],
+            [37, 23],
+            [64, 48],
+          ]) {
+            final w = size[0];
+            final h = size[1];
+            final n = w * h;
+            final r = Uint8List(n);
+            final g = Uint8List(n);
+            final b = Uint8List(n);
+            final a = Uint8List(n)..fillRange(0, n, 255);
+            // Runs and noise together, so the parse produces both long
+            // back-references and stretches of literals.
+            var s = 7;
+            for (var i = 0; i < n; i++) {
+              s = (s * 16807) % 2147483647;
+              final flat = (i ~/ w) % 3 == 0;
+              r[i] = flat ? 60 : (s >> 8) & 0xff;
+              g[i] = flat ? 120 : (s >> 12) & 0xff;
+              b[i] = flat ? 200 : (s >> 16) & 0xff;
+            }
+
+            final matches = computeMatches(r, g, b, a, n, w);
+            final allLiterals = VP8LCover(n)..cover.fillRange(0, n, 1);
+            final costs = VP8LCostModel.fromCover(allLiterals, r, g, b, a, w);
+
+            // Poison, so that reading a position the parse did not write is a
+            // detectable value rather than a plausible one.
+            const poison = 0x0badf00d;
+            final parse = VP8LCover(n)
+              ..cover.fillRange(0, n, poison)
+              ..distance.fillRange(0, n, poison);
+            optimalCover(matches, costs, r, g, b, a, w, parse);
+            final cover = parse.cover;
+            final coverDistance = parse.distance;
+
+            // Walk the cover exactly as refsFromCover does.
+            var i = 0;
+            var tokens = 0;
+            while (i < n) {
+              expect(cover[i], isNot(equals(poison)),
+                  reason: '${w}x$h: token at $i was left by the greedy parse');
+              final len = cover[i];
+              expect(len, greaterThanOrEqualTo(1),
+                  reason: '${w}x$h: token at $i has length $len');
+              if (len > 1) {
+                expect(coverDistance[i], isNot(equals(poison)),
+                    reason: '${w}x$h: distance at $i was never written');
+              }
+              i += len > 1 ? len : 1;
+              tokens++;
+            }
+            expect(i, equals(n), reason: '${w}x$h: the walk overran the image');
+
+            // And the same walk is what builds the arrays, so their lengths
+            // have to agree with it.
+            final refs = refsFromCover(parse);
+            expect(refs.isLiteral.length, equals(tokens), reason: '${w}x$h');
+            expect(
+                refs.literalIndex.length + refs.length.length, equals(tokens),
+                reason: '${w}x$h');
+            expect(refs.distance.length, equals(refs.length.length),
+                reason: '${w}x$h');
+            expect(refs.position.length, equals(tokens), reason: '${w}x$h');
           }
         });
       });

@@ -25,10 +25,10 @@ int selectColorCacheBits(
     Uint8List g,
     Uint8List b,
     Uint8List a,
-    List<bool> tokenIsLit,
-    List<int> tokenLitIdx,
-    List<int> tokenLen,
-    List<int> tokenDist,
+    Uint8List tokenIsLit,
+    Int32List tokenLitIdx,
+    Int32List tokenLen,
+    Int32List tokenDist,
     int width,
     Int32List outKeys) {
   var bestBits = 0;
@@ -65,9 +65,9 @@ void _walkColorCache(
     Uint8List g,
     Uint8List b,
     Uint8List a,
-    List<bool> tokenIsLit,
-    List<int> tokenLitIdx,
-    List<int> tokenLen,
+    Uint8List tokenIsLit,
+    Int32List tokenLitIdx,
+    Int32List tokenLen,
     int cacheBits,
     Int32List outKeys) {
   final cache = Uint32List(1 << cacheBits);
@@ -85,7 +85,7 @@ void _walkColorCache(
       ((argb * _colorCacheHashMultiplier) & 0xffffffff) >> shift;
 
   for (final isLit in tokenIsLit) {
-    if (isLit) {
+    if (isLit != 0) {
       final argb = argbOf(tokenLitIdx[litPtr]);
       final key = keyOf(argb);
       // A pixel is only inserted once it has been coded, so the lookup sees
@@ -117,10 +117,10 @@ double _estimateCost(
     Uint8List g,
     Uint8List b,
     Uint8List a,
-    List<bool> tokenIsLit,
-    List<int> tokenLitIdx,
-    List<int> tokenLen,
-    List<int> tokenDist,
+    Uint8List tokenIsLit,
+    Int32List tokenLitIdx,
+    Int32List tokenLen,
+    Int32List tokenDist,
     int width,
     int cacheBits,
     Int32List keys) {
@@ -134,7 +134,7 @@ double _estimateCost(
   var litPtr = 0;
   var refPtr = 0;
   for (final isLit in tokenIsLit) {
-    if (isLit) {
+    if (isLit != 0) {
       final key = keys[litPtr];
       final idx = tokenLitIdx[litPtr++];
       if (key >= 0) {

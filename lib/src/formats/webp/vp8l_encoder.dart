@@ -222,16 +222,13 @@ class VP8LEncoder {
     // matches once, price the symbols from the plainest reading of them, and
     // only then choose the cover that actually codes smallest.
     final matches = computeMatches(r, g, b, a, numPixels, width);
-    final greedyDistance = Int32List(numPixels);
-    final greedy = _greedyCover(matches, numPixels, greedyDistance);
-    final costs = VP8LCostModel.fromCover(
-        greedy, greedyDistance, r, g, b, a, numPixels, width);
-    final coverDistance = Int32List(numPixels);
-    final refs = refsFromCover(
-        optimalCover(
-            matches, costs, r, g, b, a, numPixels, width, coverDistance),
-        coverDistance,
-        numPixels);
+    // The greedy cover is dead once priced, and the optimal one is written at
+    // exactly the positions read back, so one parse serves both.
+    final parse = VP8LCover(numPixels);
+    _greedyCover(matches, parse);
+    final costs = VP8LCostModel.fromCover(parse, r, g, b, a, width);
+    optimalCover(matches, costs, r, g, b, a, width, parse);
+    final refs = refsFromCover(parse);
     final tokenIsLit = refs.isLiteral;
     final tokenLitIdx = refs.literalIndex;
     final tokenLen = refs.length;
@@ -333,7 +330,7 @@ class VP8LEncoder {
     var refPtr = 0;
     for (var t = 0; t < tokenIsLit.length; t++) {
       final h = histograms[tokenGroup[t]];
-      if (tokenIsLit[t]) {
+      if (tokenIsLit[t] != 0) {
         final key = cacheKeys[litPtr];
         final idx = tokenLitIdx[litPtr++];
         if (key >= 0) {
@@ -359,7 +356,7 @@ class VP8LEncoder {
     refPtr = 0;
     for (var t = 0; t < tokenIsLit.length; t++) {
       final c = codes[tokenGroup[t]];
-      if (tokenIsLit[t]) {
+      if (tokenIsLit[t] != 0) {
         final key = cacheKeys[litPtr];
         final idx = tokenLitIdx[litPtr++];
         if (key >= 0) {
@@ -425,8 +422,8 @@ class VP8LEncoder {
       Uint8List g,
       Uint8List b,
       Uint8List a,
-      List<bool> tokenIsLit,
-      List<int> tokenLitIdx,
+      Uint8List tokenIsLit,
+      Int32List tokenLitIdx,
       Int32List refLenSym,
       Int32List refDistSym,
       Int32List tokenPos,
@@ -463,7 +460,7 @@ class VP8LEncoder {
           y++;
         }
         final h = blocks[(y >> bits) * xsize + ((p - rowStart) >> bits)];
-        if (tokenIsLit[t]) {
+        if (tokenIsLit[t] != 0) {
           final key = cacheKeys[litPtr];
           final idx = tokenLitIdx[litPtr++];
           if (key >= 0) {
@@ -642,9 +639,10 @@ class VP8LEncoder {
 
   /// Takes every match on offer, which is what the symbols have to be priced
   /// from before any better cover can be judged.
-  static Int32List _greedyCover(
-      VP8LMatches matches, int numPixels, Int32List distance) {
-    final cover = Int32List(numPixels);
+  static void _greedyCover(VP8LMatches matches, VP8LCover parse) {
+    final numPixels = parse.numPixels;
+    final cover = parse.cover;
+    final distance = parse.distance;
     var i = 0;
     while (i < numPixels) {
       final len = matches.length[i];
@@ -653,7 +651,6 @@ class VP8LEncoder {
       distance[i] = matches.distance[i];
       i += take;
     }
-    return cover;
   }
 
   /// Writes the cross-color sub-image, one pixel per block holding that
