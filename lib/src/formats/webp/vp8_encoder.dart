@@ -50,10 +50,13 @@ class VP8Lossy {
 /// Encodes [image] as a VP8 keyframe.
 @internal
 VP8Lossy encodeVP8(Image image, VP8Config config) {
-  if (image.width > maxDimension || image.height > maxDimension) {
+  if (image.width <= 0 ||
+      image.height <= 0 ||
+      image.width > maxDimension ||
+      image.height > maxDimension) {
     // The frame header has fourteen bits for each dimension; letting one
     // overflow into the next field would produce a stream no decoder can read.
-    throw ImageException('WebP images are limited to '
+    throw ImageException('WebP images must be between 1x1 and '
         '${maxDimension}x$maxDimension, got ${image.width}x${image.height}');
   }
   final yuv = importYuv(image);

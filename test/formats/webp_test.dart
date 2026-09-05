@@ -1171,6 +1171,24 @@ void main() {
           expect(decoded, isNotNull);
           expect(decoded!.width, equals(maxDimension));
         });
+
+        test('refuses an empty image', () {
+          // The other end of the same field. `copyResize` reaches it on any
+          // picture thin enough that the scaled side rounds to nothing.
+          for (final size in const [
+            [0, 4],
+            [4, 0],
+            [0, 0],
+          ]) {
+            for (final lossless in const [true, false]) {
+              expect(
+                  () => encodeWebP(Image(width: size[0], height: size[1]),
+                      lossless: lossless),
+                  throwsA(isA<ImageException>()),
+                  reason: '${size[0]}x${size[1]} lossless=$lossless');
+            }
+          }
+        });
       });
 
       group('transparent pixels', () {

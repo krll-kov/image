@@ -4,13 +4,17 @@
 // run in a browser. Everything here is synthetic, so this file runs under
 //
 //     dart test -p chrome test/formats/webp_web_test.dart
+//     dart test -p chrome -c dart2wasm test/formats/webp_web_test.dart
 //
-// as well as in the normal suite. Doing that matters: on the web a Dart int is
-// a double, `<<` is a 32-bit shift, and `>>` returns its result *unsigned*, so
-// `-5 >> 1` is 4294967293 rather than -3. The lossy encoder once compiled
+// as well as in the normal suite. Doing that matters: under dart2js a Dart int
+// is a double, `<<` is a 32-bit shift, and `>>` returns its result *unsigned*,
+// so `-5 >> 1` is 4294967293 rather than -3. The lossy encoder once compiled
 // cleanly for the web and produced 8 dB where it should have produced 34,
 // because every transform shifts signed intermediates. `dart analyze` was
 // clean, the whole VM suite passed, and `dart compile js` succeeded.
+//
+// dart2wasm has real 64-bit integers and behaves like the VM, so it is a third
+// case rather than a repeat of the second.
 
 import 'dart:math' as math;
 

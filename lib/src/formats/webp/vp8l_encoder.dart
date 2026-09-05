@@ -42,11 +42,15 @@ class VP8LEncoder {
   Uint8List encodeVP8L(Image image) {
     final width = image.width;
     final height = image.height;
-    if (width > maxDimension || height > maxDimension) {
+    if (width <= 0 ||
+        height <= 0 ||
+        width > maxDimension ||
+        height > maxDimension) {
       // The VP8L header has fourteen bits for each dimension. Silently letting
       // one overflow into the next field produces a stream that no decoder can
-      // read, so refuse instead.
-      throw ImageException('WebP images are limited to '
+      // read, so refuse instead. Zero is stored less one, so it would say
+      // 16384.
+      throw ImageException('WebP images must be between 1x1 and '
           '${maxDimension}x$maxDimension, got ${width}x$height');
     }
 
