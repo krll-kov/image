@@ -17,6 +17,7 @@ import 'package:image/src/formats/webp/vp8l_analysis.dart';
 import 'package:image/src/formats/webp/vp8l_backward_refs.dart';
 import 'package:image/src/formats/webp/vp8l_bit_writer.dart';
 import 'package:image/src/formats/webp/vp8l_encoder.dart';
+import 'package:image/src/formats/webp/vp8l_huffman_encoder.dart';
 import 'package:image/src/formats/webp/vp8l_optimal_parse.dart';
 import 'package:image/src/formats/webp/vp8l_predictor.dart';
 import 'package:test/test.dart';
@@ -1567,6 +1568,78 @@ void main() {
           ..writeBits(0, 4)
           ..flush();
         expect(w.getBytes(), equals([0x0d]));
+      });
+    });
+
+    group('source formats', () {
+      test('a two channel image keeps its transparency', () {
+        // Two channels is luminance and alpha. Reading alpha only from four
+        // channel images writes the picture opaque.
+        final gray = Image(width: 64, height: 64, numChannels: 2);
+        for (var y = 0; y < 64; y++) {
+          for (var x = 0; x < 64; x++) {
+            gray.getPixel(x, y)
+              ..r = x * 4
+              ..a = y * 4;
+          }
+        }
+
+        for (final lossless in const [true, false]) {
+          final back =
+              decodeWebP(encodeWebP(gray, exact: true, lossless: lossless))!;
+          for (var y = 0; y < 64; y++) {
+            for (var x = 0; x < 64; x++) {
+              expect(back.getPixel(x, y).a, equals(gray.getPixel(x, y).a),
+                  reason: 'alpha at $x,$y, lossless $lossless');
+            }
+          }
+        }
+      });
+
+      test('a sixteen bit image is scaled down, not clipped', () {
+        // Clamping instead of scaling turns every value above 255 white,
+        // which is most of a 16 bit image.
+        final deep =
+            Image(width: 64, height: 64, numChannels: 4, format: Format.uint16);
+        for (var y = 0; y < 64; y++) {
+          for (var x = 0; x < 64; x++) {
+            deep.getPixel(x, y)
+              ..r = x * 1024
+              ..g = y * 1024
+              ..b = 32768
+              ..a = 65535 - y * 512;
+          }
+        }
+
+        final back = decodeWebP(encodeWebP(deep, exact: true))!;
+        for (var y = 0; y < 64; y++) {
+          for (var x = 0; x < 64; x++) {
+            final p = deep.getPixel(x, y);
+            final q = back.getPixel(x, y);
+            for (final (name, want, got) in [
+              ('red', p.r, q.r),
+              ('green', p.g, q.g),
+              ('blue', p.b, q.b),
+              ('alpha', p.a, q.a),
+            ]) {
+              expect(got, closeTo(want * 255 / 65535, 1),
+                  reason: '$name at $x,$y');
+            }
+          }
+        }
+      });
+    });
+
+    group('huffman', () {
+      test('a code with one symbol costs no bits', () {
+        // A length of one puts a spare bit before every token of the group
+        // and the rest of the stream decodes as garbage. Only symbols above
+        // 255 reach it: the simple format takes the rest.
+        for (final symbol in const [0, 1, 7, 255, 268, 279]) {
+          final lengths = List<int>.filled(280, 0)..[symbol] = 1;
+          writeHuffmanCode(VP8LBitWriter(), 280, lengths);
+          expect(lengths[symbol], equals(0), reason: 'symbol $symbol');
+        }
       });
     });
   });

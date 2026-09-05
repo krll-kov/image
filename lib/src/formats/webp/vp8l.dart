@@ -1226,7 +1226,8 @@ class VP8L {
           final blue = htrees[_blue][0].value;
           final alpha = htrees[_alpha][0].value;
           htreeGroup.literalArb = (alpha << 24) | (red << 16) | blue;
-          if (totalSize == 0 && htrees[_green][0].value < _numLengthCodes) {
+          // Trivial means the one green symbol is a literal.
+          if (totalSize == 0 && htrees[_green][0].value < _numLiteralCodes) {
             htreeGroup
               ..isTrivialCode = true
               ..literalArb |= htrees[_green][0].value << 8;

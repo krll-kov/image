@@ -172,6 +172,9 @@ List<int> buildHuffmanCodeLengths(
 }
 
 /// Write a Huffman code definition in VP8L format.
+///
+/// A code with one used symbol has its length in [codeLengths] set to zero, in
+/// either format: a decoder spends no bits on such a tree.
 @internal
 @pragma('vm:unsafe:no-bounds-checks')
 void writeHuffmanCode(
@@ -207,8 +210,7 @@ void writeHuffmanCode(
     }
     if (used.length == 2) {
       bw.writeBits(used[1], 8);
-    } else if (used.length == 1) {
-      // 1-symbol simple codes take 0 bits in the bitstream.
+    } else {
       codeLengths[sym0] = 0;
     }
     return;
@@ -270,6 +272,10 @@ void writeHuffmanCode(
     if (s.extraBits > 0) {
       bw.writeBits(s.extraValue, s.extraBits);
     }
+  }
+
+  if (used.length == 1) {
+    codeLengths[used[0]] = 0;
   }
 }
 

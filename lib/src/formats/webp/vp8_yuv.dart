@@ -124,7 +124,7 @@ VP8Yuv importYuv(Image image) {
   final v = Uint8List(uvWidth * uvHeight);
 
   var hasAlpha = false;
-  if (image.numChannels >= 4) {
+  if (image.hasAlpha) {
     for (var i = 3; i < rgba.length; i += 4) {
       if (rgba[i] != 0xff) {
         hasAlpha = true;

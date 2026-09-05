@@ -60,16 +60,28 @@ class VP8LEncoder {
     final b = Uint8List(numPixels);
     final a = Uint8List(numPixels);
 
-    final hasAlpha = image.numChannels >= 4;
+    // Two channels is luminance and alpha.
+    final hasAlpha = image.hasAlpha;
+    // WebP carries eight bits a channel, so a deeper image is scaled, not
+    // clamped: clamping turns everything above 255 white.
+    final maxValue = image.maxChannelValue;
+    final scale = maxValue == 255 ? 1.0 : 255.0 / maxValue;
     var alphaIsUsed = false;
     var i = 0;
     for (var y = 0; y < height; y++) {
       for (var x = 0; x < width; x++) {
         final p = image.getPixel(x, y);
-        g[i] = p.g.toInt().clamp(0, 255);
-        r[i] = p.r.toInt().clamp(0, 255);
-        b[i] = p.b.toInt().clamp(0, 255);
-        a[i] = hasAlpha ? p.a.toInt().clamp(0, 255) : 255;
+        if (scale == 1.0) {
+          g[i] = p.g.toInt().clamp(0, 255);
+          r[i] = p.r.toInt().clamp(0, 255);
+          b[i] = p.b.toInt().clamp(0, 255);
+          a[i] = hasAlpha ? p.a.toInt().clamp(0, 255) : 255;
+        } else {
+          g[i] = (p.g * scale).round().clamp(0, 255);
+          r[i] = (p.r * scale).round().clamp(0, 255);
+          b[i] = (p.b * scale).round().clamp(0, 255);
+          a[i] = hasAlpha ? (p.a * scale).round().clamp(0, 255) : 255;
+        }
         if (a[i] != 255) alphaIsUsed = true;
         i++;
       }

@@ -191,7 +191,7 @@ class WebPEncoder extends Encoder {
   /// follow the channel count.
   static bool _hasTransparency(Image image) {
     for (final frame in image.frames) {
-      if (frame.numChannels < 4) {
+      if (!frame.hasAlpha) {
         continue;
       }
       for (final p in frame) {
