@@ -17,10 +17,13 @@
 // case rather than a repeat of the second.
 
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:image/image.dart';
 import 'package:image/src/formats/webp/vp8_rd.dart';
 import 'package:image/src/formats/webp/vp8_sar.dart';
+import 'package:image/src/formats/webp/vp8l_color_cache_encoder.dart';
+import 'package:image/src/formats/webp/vp8l_color_hash.dart';
 import 'package:test/test.dart';
 
 /// A picture with a gradient, an edge, noise and a flat corner, so that every
@@ -222,6 +225,75 @@ void main() {
           }
         }
       }
+    });
+  });
+
+  group('color cache', () {
+    // The cache is addressed by `argb * 0x1e35a7bd`, a product that reaches
+    // 2^62 and so is rounded on dart2js, landing on the neighbouring slot for
+    // a few colors in every million. The VM cannot see it, and neither can a
+    // round-trip: the decoder hashes the same way, so the package agrees with
+    // itself while every conforming reader disagrees.
+    //
+    // These are colors where the two multiplies differ. The keys are exact.
+    const divergent = {
+      0xff00ea08: [63, 255],
+      0xff0aeeed: [169, 679],
+      0xff01d410: [60, 243],
+    };
+
+    test('a color hashes to the same slot on every platform', () {
+      divergent.forEach((argb, keys) {
+        expect(colorCacheKey(argb, 24), equals(keys[0]),
+            reason: '${argb.toRadixString(16)} at 8 cache bits');
+        expect(colorCacheKey(argb, 22), equals(keys[1]),
+            reason: '${argb.toRadixString(16)} at 10 cache bits');
+      });
+    });
+
+    test('the slot the encoder writes is the slot the format defines', () {
+      // A repeating palette, which is what makes a cache pay for itself, with
+      // one of the divergent colors in it. All literals, so the second
+      // occurrence of a color is a cache reference.
+      const target = 0xff00ea08;
+      const palette = 512;
+      const n = 8192;
+      final a = Uint8List(n);
+      final r = Uint8List(n);
+      final g = Uint8List(n);
+      final b = Uint8List(n);
+      for (var i = 0; i < n; i++) {
+        final j = i % palette;
+        // Two in a row, so the reference does not depend on what else landed
+        // in the slot meanwhile.
+        if (j < 2) {
+          a[i] = (target >> 24) & 0xff;
+          r[i] = (target >> 16) & 0xff;
+          g[i] = (target >> 8) & 0xff;
+          b[i] = target & 0xff;
+        } else {
+          a[i] = 0xff;
+          r[i] = (j * 7) & 0xff;
+          g[i] = (j * 29) & 0xff;
+          b[i] = (j * 53) & 0xff;
+        }
+      }
+
+      final isLiteral = Uint8List(n)..fillRange(0, n, 1);
+      final literalIndex = Int32List(n);
+      for (var i = 0; i < n; i++) {
+        literalIndex[i] = i;
+      }
+      final keys = Int32List(n);
+      final bits = selectColorCacheBits(r, g, b, a, isLiteral, literalIndex,
+          Int32List(0), Int32List(0), 64, keys);
+      expect(bits, equals(10), reason: 'the palette should earn a cache');
+
+      // The stream carries this number and the decoder answers from the slot
+      // its own hash names. 255 is the slot the format defines here; a rounded
+      // multiply writes 256, and the reader hands back whatever sits there.
+      expect(keys[1], equals(255));
+      expect(keys[1], equals(colorCacheKey(target, 32 - bits)));
     });
   });
 }

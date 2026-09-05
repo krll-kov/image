@@ -320,11 +320,12 @@ class WebPDecoder extends Decoder {
 
   bool _getAnimInfo(InputBuffer input, WebPInfo webp) {
     final c = input.readUint32();
-    // Color is stored in blue,green,red,alpha order.
-    final a = c & 0xff;
-    final r = (c >> 8) & 0xff;
-    final g = (c >> 16) & 0xff;
-    final b = (c >> 24) & 0xff;
+    // Blue, green, red, alpha in that byte order, read little endian, so blue
+    // arrives in the low byte.
+    final b = c & 0xff;
+    final g = (c >> 8) & 0xff;
+    final r = (c >> 16) & 0xff;
+    final a = (c >> 24) & 0xff;
     webp
       ..backgroundColor = ColorRgba8(r, g, b, a)
       ..animLoopCount = input.readUint16();

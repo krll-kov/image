@@ -74,10 +74,10 @@ Uint8List vp8xChunkData(int flags, int width, int height) {
 /// The ANIM chunk payload: the canvas background color and the loop count.
 @internal
 Uint8List animChunkData(int r, int g, int b, int a, int loopCount) {
-  // The decoder reads the color back as blue, green, red, alpha from the top
-  // byte down, so pack it that way.
+  // The chunk holds blue, green, red, alpha in that byte order, and the buffer
+  // is little endian, so the packed value runs the other way.
   final out = OutputBuffer()
-    ..writeUint32((b << 24) | (g << 16) | (r << 8) | a)
+    ..writeUint32((a << 24) | (r << 16) | (g << 8) | b)
     ..writeUint16(loopCount);
   return out.getBytes();
 }

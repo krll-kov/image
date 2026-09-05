@@ -819,7 +819,7 @@ int _tTransformColumn(
       w3 * (b3 < 0 ? -b3 : b3);
 }
 
-/// The weighted spectrum of one 4x4 block, as [disto4x4] measures it.
+/// The weighted spectrum of one 4x4 block, which [distoFrom] compares.
 ///
 /// Exposed on its own because the source block of a mode search does not
 /// change while the candidates do, so its spectrum is worth computing once
@@ -828,20 +828,15 @@ int _tTransformColumn(
 int spectrum4x4(Uint8List src, int off) => _tTransform(src, off);
 
 /// How far a block is from a spectrum already measured by [spectrum4x4].
-@internal
-int distoFrom(int reference, Uint8List b, int bOff) {
-  final d = _tTransform(b, bOff) - reference;
-  return (d < 0 ? -d : d) >> 5;
-}
-
-/// How far apart two 4x4 blocks are in the frequency domain.
 ///
 /// Squared error alone rates a blurred block the same as a block whose detail
 /// merely moved; comparing weighted spectra instead is what keeps texture from
 /// being quantised away.
 @internal
-int disto4x4(Uint8List a, int aOff, Uint8List b, int bOff) =>
-    distoFrom(spectrum4x4(a, aOff), b, bOff);
+int distoFrom(int reference, Uint8List b, int bOff) {
+  final d = _tTransform(b, bOff) - reference;
+  return (d < 0 ? -d : d) >> 5;
+}
 
 /// The sum of each of the four 4x4 blocks of a 16x4 strip, written to [dc]
 /// starting at [dcOff].

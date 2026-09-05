@@ -45,7 +45,7 @@ const _flatnessLimitI4 = 3;
 const _flatnessLimitUV = 2;
 const _flatnessPenalty = 140;
 
-/// Weights of the spectral distortion, matching [disto4x4].
+/// Weights of the spectral distortion, matching [distoFrom].
 const _weightTrellis = [
   30, 27, 19, 11, //
   27, 24, 17, 10,

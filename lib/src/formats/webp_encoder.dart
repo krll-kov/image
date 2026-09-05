@@ -118,7 +118,7 @@ class WebPEncoder extends Encoder {
           vp8xChunkData(
               vp8xFlags(
                 hasIcc: icc != null,
-                hasAlpha: image.numChannels >= 4,
+                hasAlpha: hasAlphaChunk || _hasTransparency(image),
                 hasExif: exif != null,
                 hasXmp: false,
                 hasAnimation: animate,
@@ -183,6 +183,24 @@ class WebPEncoder extends Encoder {
       if (alpha != null) WebPChunk('ALPH', alpha),
       WebPChunk('VP8 ', coded.bitstream),
     ];
+  }
+
+  /// Whether any frame has a pixel that is not fully opaque.
+  ///
+  /// An opaque four channel image is written without alpha, so the flag cannot
+  /// follow the channel count.
+  static bool _hasTransparency(Image image) {
+    for (final frame in image.frames) {
+      if (frame.numChannels < 4) {
+        continue;
+      }
+      for (final p in frame) {
+        if (p.a != p.maxChannelValue) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   static Uint8List? _exifBytes(Image image) {

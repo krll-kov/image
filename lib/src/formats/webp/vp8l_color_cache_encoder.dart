@@ -6,14 +6,13 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import '../../util/_internal.dart';
+import 'vp8l_color_hash.dart';
 import 'vp8l_huffman_encoder.dart' as huffman;
 
 /// Cache sizes considered by [selectColorCacheBits]. A small image cannot
 /// pay back the cost of describing a large alphabet, so a mid size is offered
 /// as well. libwebp never emits more than 10 bits, so neither does this.
 const _colorCacheCandidates = [0, 8, 10];
-
-const _colorCacheHashMultiplier = 0x1e35a7bd;
 
 /// Picks the color cache size that codes the token stream most compactly and
 /// fills [outKeys] with the cache key of every literal that becomes a cache
@@ -81,8 +80,7 @@ void _walkColorCache(
 
   int argbOf(int idx) =>
       (a[idx] << 24) | (r[idx] << 16) | (g[idx] << 8) | b[idx];
-  int keyOf(int argb) =>
-      ((argb * _colorCacheHashMultiplier) & 0xffffffff) >> shift;
+  int keyOf(int argb) => colorCacheKey(argb, shift);
 
   for (final isLit in tokenIsLit) {
     if (isLit != 0) {

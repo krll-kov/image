@@ -88,17 +88,22 @@ void optimalCover(VP8LMatches matches, VP8LCostModel costs, Uint8List r,
       final int maxLen;
       final int dist;
       final double distBits;
+      // The length decides whether the candidate is usable at all, so it is
+      // read before the distance is priced.
       if (which == 0) {
         maxLen = matchLen[i];
+        if (maxLen < _minMatchLen) {
+          continue;
+        }
         dist = matchDist[i];
         distBits = here + costs.distanceBits(dist, width);
       } else {
         maxLen = cheapLen[which - 1][i];
+        if (maxLen < _minMatchLen) {
+          continue;
+        }
         dist = cheapDists[which - 1];
         distBits = here + cheapDistBits[which - 1];
-      }
-      if (maxLen < _minMatchLen) {
-        continue;
       }
 
       final weighed = maxLen < _lengthsWeighed ? maxLen : _lengthsWeighed;

@@ -7,6 +7,7 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:image/image.dart';
+import 'package:image/src/formats/webp/vp8_alpha.dart';
 import 'package:image/src/formats/webp/vp8_config.dart';
 import 'package:image/src/formats/webp/vp8_rd.dart';
 import 'package:image/src/formats/webp/vp8_sar.dart';
@@ -14,6 +15,7 @@ import 'package:image/src/formats/webp/vp8_state.dart';
 import 'package:image/src/formats/webp/vp8_yuv.dart';
 import 'package:image/src/formats/webp/vp8l_analysis.dart';
 import 'package:image/src/formats/webp/vp8l_backward_refs.dart';
+import 'package:image/src/formats/webp/vp8l_bit_writer.dart';
 import 'package:image/src/formats/webp/vp8l_encoder.dart';
 import 'package:image/src/formats/webp/vp8l_optimal_parse.dart';
 import 'package:image/src/formats/webp/vp8l_predictor.dart';
@@ -1453,6 +1455,120 @@ void main() {
         });
       });
     });
+
+    group('container', () {
+      test('the animation background color is stored blue, green, red, alpha',
+          () {
+        // Packed the way the channels are named, the bytes land reversed and
+        // opaque red reads as transparent cyan in every other reader.
+        final anim = _flat(32, 32, 10, 20, 30)
+          ..backgroundColor = ColorRgba8(255, 0, 0, 255);
+        anim.addFrame(_flat(32, 32, 30, 20, 10)).frameDuration = 100;
+
+        final payload = _chunk(encodeWebP(anim), 'ANIM')!;
+        expect(payload.sublist(0, 4), equals([0, 0, 255, 255]),
+            reason: 'blue, green, red, alpha');
+
+        final decoder = WebPDecoder(encodeWebP(anim));
+        final back = decoder.info!.backgroundColor!;
+        expect([back.r, back.g, back.b, back.a], equals([255, 0, 0, 255]));
+      });
+
+      test(
+          'the alpha flag says what the file carries, not how many channels '
+          'the image had', () {
+        // Opaque throughout, so no alpha is written and claiming it leaves a
+        // reader looking for a transparency the file does not have.
+        final opaque = _flat(64, 64, 90, 140, 200, channels: 4);
+        opaque.exif.imageIfd['Make'] = 'test';
+        expect((_chunk(encodeWebP(opaque), 'VP8X')![0] >> 4) & 1, equals(0),
+            reason: 'opaque four channel image with metadata');
+
+        final transparent =
+            _flat(64, 64, 90, 140, 200, channels: 4, alpha: 128);
+        transparent.exif.imageIfd['Make'] = 'test';
+        expect(
+            (_chunk(encodeWebP(transparent), 'VP8X')![0] >> 4) & 1, equals(1),
+            reason: 'the same image with a transparency');
+      });
+    });
+
+    group('alpha chunk', () {
+      test('a plane reduced to fewer levels says so in its header', () {
+        // Quantizing leaves steps in a gradient, and the flag is what tells a
+        // decoder to smooth them.
+        final soft = Image(width: 96, height: 96, numChannels: 4);
+        for (var y = 0; y < 96; y++) {
+          for (var x = 0; x < 96; x++) {
+            soft.getPixel(x, y)
+              ..r = 200
+              ..g = 120
+              ..b = 60
+              ..a = (x * 255 / 95).round();
+          }
+        }
+
+        int preprocessing(int alphaQuality) {
+          final webp = encodeWebP(soft,
+              lossless: false, quality: 90, alphaQuality: alphaQuality);
+          return (_chunk(webp, 'ALPH')![0] >> 4) & 3;
+        }
+
+        expect(preprocessing(20), equals(1), reason: 'levels were reduced');
+        expect(preprocessing(100), equals(0), reason: 'the plane is exact');
+      });
+
+      test('no filtering is weighed even when the estimate prefers a filter',
+          () {
+        // Filtering this plane costs a quarter more than leaving it alone,
+        // and the fast search chooses between the two, so it can never lose to
+        // asking for no filtering.
+        final image =
+            decodePng(File('test/_data/png/test.png').readAsBytesSync())!;
+        final plane = Uint8List(image.width * image.height);
+        var i = 0;
+        for (var y = 0; y < image.height; y++) {
+          for (var x = 0; x < image.width; x++) {
+            plane[i++] = image.getPixel(x, y).a.toInt();
+          }
+        }
+
+        final fast = encodeAlphaChunk(plane, image.width, image.height,
+            filtering: alphaFilterFast);
+        final none = encodeAlphaChunk(plane, image.width, image.height,
+            filtering: alphaFilterNone);
+        expect(fast.length, lessThanOrEqualTo(none.length));
+      });
+    });
+
+    group('bit writer', () {
+      test('the bytes it hands back are exactly the bytes written', () {
+        // The buffer grows by doubling, so the result is cut to the length
+        // written.
+        for (final count in const [1, 7, 4095, 4096, 4097, 9000]) {
+          final w = VP8LBitWriter();
+          for (var i = 0; i < count; i++) {
+            w.writeBits(i & 0xff, 8);
+          }
+          w.flush();
+          final bytes = w.getBytes();
+          expect(bytes.length, equals(count), reason: '$count bytes');
+          for (var i = 0; i < count; i++) {
+            expect(bytes[i], equals(i & 0xff), reason: 'byte $i of $count');
+          }
+        }
+      });
+
+      test('bits shorter than a byte pack low end first', () {
+        final w = VP8LBitWriter()
+          ..writeBits(1, 1)
+          ..writeBits(0, 1)
+          ..writeBits(3, 2)
+          ..writeBits(0, 4)
+          ..flush();
+        expect(w.getBytes(), equals([0x0d]));
+      });
+    });
   });
 }
 
@@ -1609,3 +1725,33 @@ const _webpTests = {
     'numFrames': 31,
   },
 };
+
+/// A single colour image.
+Image _flat(int w, int h, int r, int g, int b,
+    {int channels = 3, int alpha = 255}) {
+  final im = Image(width: w, height: h, numChannels: channels);
+  for (final p in im) {
+    p
+      ..r = r
+      ..g = g
+      ..b = b;
+    if (channels == 4) {
+      p.a = alpha;
+    }
+  }
+  return im;
+}
+
+/// The payload of the first [id] chunk of a RIFF file, or null.
+Uint8List? _chunk(Uint8List bytes, String id) {
+  var p = 12;
+  while (p + 8 <= bytes.length) {
+    final here = String.fromCharCodes(bytes.sublist(p, p + 4));
+    final size = bytes.buffer.asByteData().getUint32(p + 4, Endian.little);
+    if (here == id) {
+      return Uint8List.sublistView(bytes, p + 8, p + 8 + size);
+    }
+    p += 8 + size + (size & 1);
+  }
+  return null;
+}

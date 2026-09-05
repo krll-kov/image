@@ -6,6 +6,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import '../../util/_internal.dart';
+import 'vp8l_color_hash.dart';
 import 'vp8l_huffman_encoder.dart' as huffman;
 
 /// The token stream for one image: literals and back-references in the order
@@ -306,10 +307,6 @@ class _Lz77 {
   late final Int32List _head;
   late final int _shift;
 
-  /// The result of the last [findMatch]: length 0 means nothing matched.
-  int matchLen = 0;
-  int matchDist = 0;
-
   /// libwebp's own pair hash, kept in 32-bit arithmetic.
   ///
   /// A 64-bit multiply would be the obvious way to mix two pixels, but on the
@@ -318,8 +315,7 @@ class _Lz77 {
   /// same thing on every platform.
   @pragma('vm:prefer-inline')
   int _hash(int first, int second) =>
-      ((_mul32(second, 0xc6a4a793) + _mul32(first, 0x5bd1e996)) &
-          0xffffffff) >>>
+      ((mul32(second, 0xc6a4a793) + mul32(first, 0x5bd1e996)) & 0xffffffff) >>>
       _shift;
 
   /// Links every position to the previous one that hashes the same.
@@ -352,60 +348,6 @@ class _Lz77 {
     }
     // The last position starts no pair, so nothing links to it.
     prev[n - 1] = -1;
-  }
-
-  /// Longest match reaching back from [at], left in [matchLen]/[matchDist].
-  @pragma('vm:unsafe:no-bounds-checks')
-  void findMatch(int at) {
-    matchLen = 0;
-    matchDist = 0;
-    final numPixels = _numPixels;
-    if (at == 0 || at + 1 >= numPixels) {
-      return;
-    }
-    final px = _px;
-    final prev = _prev;
-    final key = px[at];
-    // Nothing past the end of the image can be part of a match, so the bound
-    // is fixed for this position rather than retested every extension step.
-    var maxLen = numPixels - at;
-    if (maxLen > _maxMatchLen) {
-      maxLen = _maxMatchLen;
-    }
-    var best = 0;
-    var bestDist = 0;
-    // The chain was built ahead of time, so this position's own link already
-    // names the previous position that hashed the same.
-    var c = prev[at];
-    var steps = 0;
-    while (c >= 0 && steps < _maxChain) {
-      steps++;
-      final dist = at - c;
-      if (dist > _maxDistance) {
-        break;
-      }
-
-      // Only a longer match than the best so far can win: the chain runs from
-      // the most recent position backwards, so distance only ever grows and a
-      // later candidate of equal length is never preferable. That makes the
-      // pixel one past the current best a cheap rejection.
-      if (px[c + best] == px[at + best] && px[c] == key) {
-        var len = 1;
-        while (len < maxLen && px[at + len] == px[c + len]) {
-          len++;
-        }
-        if (len > best) {
-          best = len;
-          bestDist = dist;
-          if (best >= maxLen) {
-            break;
-          }
-        }
-      }
-      c = prev[c];
-    }
-    matchLen = best;
-    matchDist = bestDist;
   }
 }
 
@@ -505,13 +447,4 @@ class VP8LCostModel {
   double literalCost(
           Uint8List r, Uint8List g, Uint8List b, Uint8List a, int i) =>
       _green[g[i]] + _red[r[i]] + _blue[b[i]] + _alpha[a[i]];
-}
-
-/// The low 32 bits of `a * b`, computed so that no intermediate exceeds the 53
-/// bits an int is exact to on the web.
-@pragma('vm:prefer-inline')
-int _mul32(int a, int b) {
-  final lo = (a & 0xffff) * b;
-  final hi = ((a >>> 16) * b) & 0xffff;
-  return (lo + hi * 0x10000) & 0xffffffff;
 }

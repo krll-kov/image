@@ -21,12 +21,12 @@ const alphaFilterNone = 0;
 const alphaFilterFast = 1;
 const alphaFilterBest = 2;
 
+/// The value the ALPH header's preprocessing field takes when the plane was
+/// reduced to fewer levels.
+const _alphaPreprocessedLevels = 1;
+
 /// Below this many distinct values, filtering only gets in the way.
 const _minColorsForFilterNone = 16;
-
-/// Above this many, filtering usually helps but is worth checking against no
-/// filtering at all.
-const _maxColorsForFilterNone = 192;
 
 /// Encodes the alpha plane as the payload of an `ALPH` chunk.
 ///
@@ -41,11 +41,13 @@ Uint8List encodeAlphaChunk(Uint8List alpha, int width, int height,
     {int filtering = alphaFilterFast,
     bool compress = true,
     int quality = 100}) {
+  var reducedLevels = false;
   if (quality < 100) {
     // libwebp's mapping: sixteen levels already give a low error against the
     // original, so that is where the moderate quality 70 lands.
     final levels = quality <= 70 ? 2 + quality ~/ 5 : 16 + (quality - 70) * 8;
     alpha = quantizeLevels(alpha, levels);
+    reducedLevels = true;
   }
   final candidates = _filtersToTry(alpha, width, height, filtering);
   final scratch = candidates.length == 1 && candidates.first == 0
@@ -55,7 +57,8 @@ Uint8List encodeAlphaChunk(Uint8List alpha, int width, int height,
   Uint8List? best;
   for (final filter in candidates) {
     final source = _applyFilter(alpha, width, height, filter, scratch);
-    final chunk = _encodeOne(source, width, height, filter, compress);
+    final chunk =
+        _encodeOne(source, width, height, filter, compress, reducedLevels);
     if (best == null || chunk.length < best.length) {
       best = chunk;
     }
@@ -175,11 +178,9 @@ List<int> _filtersToTry(Uint8List alpha, int width, int height, int filtering) {
   if (estimated == WebPFilters.filterNone) {
     return [WebPFilters.filterNone];
   }
-  // With many distinct values the estimate is less reliable, so keep no
-  // filtering in the running.
-  return numColors > _maxColorsForFilterNone
-      ? [WebPFilters.filterNone, estimated]
-      : [estimated];
+  // The estimate reads gradients and misses planes that code better unfiltered,
+  // so no filtering is weighed whatever it said.
+  return [WebPFilters.filterNone, estimated];
 }
 
 Uint8List _applyFilter(
@@ -193,8 +194,8 @@ Uint8List _applyFilter(
 }
 
 /// Builds one candidate chunk: the header byte and the coded plane.
-Uint8List _encodeOne(
-    Uint8List source, int width, int height, int filter, bool compress) {
+Uint8List _encodeOne(Uint8List source, int width, int height, int filter,
+    bool compress, bool reducedLevels) {
   var method = compress ? _alphaLosslessCompression : _alphaNoCompression;
   Uint8List data;
   if (compress) {
@@ -216,7 +217,9 @@ Uint8List _encodeOne(
   }
 
   final out = Uint8List(1 + data.length)
-    ..[0] = method | (filter << 2)
+    ..[0] = method |
+        (filter << 2) |
+        (reducedLevels ? _alphaPreprocessedLevels << 4 : 0)
     ..setRange(1, 1 + data.length, data);
   return out;
 }
