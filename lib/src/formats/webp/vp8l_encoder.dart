@@ -32,11 +32,10 @@ const maxDimension = 16383;
 class VP8LEncoder {
   VP8LEncoder({this.exact = false});
 
-  /// Whether the colour hidden under fully transparent pixels must be kept.
+  /// Whether the colour hidden under fully transparent pixels must be kept
   ///
-  /// It is invisible either way, and flattening it compresses far better, so
-  /// the default is to flatten — which is also what cwebp does unless given
-  /// `-exact`.
+  /// Clearing it flattens those pixels into long runs, which is what cwebp
+  /// does unless given its own `-exact`
   final bool exact;
 
   Uint8List encodeVP8L(Image image) {
@@ -62,6 +61,9 @@ class VP8LEncoder {
 
     // Two channels is luminance and alpha.
     final hasAlpha = image.hasAlpha;
+    // Pixel.g and Pixel.b answer zero for a one channel image, so reading
+    // them writes the picture in red
+    final grey = image.numChannels == 1;
     // WebP carries eight bits a channel, so a deeper image is scaled, not
     // clamped: clamping turns everything above 255 white.
     final maxValue = image.maxChannelValue;
@@ -71,15 +73,17 @@ class VP8LEncoder {
     for (var y = 0; y < height; y++) {
       for (var x = 0; x < width; x++) {
         final p = image.getPixel(x, y);
+        final pg = grey ? p.r : p.g;
+        final pb = grey ? p.r : p.b;
         if (scale == 1.0) {
-          g[i] = p.g.toInt().clamp(0, 255);
+          g[i] = pg.toInt().clamp(0, 255);
           r[i] = p.r.toInt().clamp(0, 255);
-          b[i] = p.b.toInt().clamp(0, 255);
+          b[i] = pb.toInt().clamp(0, 255);
           a[i] = hasAlpha ? p.a.toInt().clamp(0, 255) : 255;
         } else {
-          g[i] = (p.g * scale).round().clamp(0, 255);
+          g[i] = (pg * scale).round().clamp(0, 255);
           r[i] = (p.r * scale).round().clamp(0, 255);
-          b[i] = (p.b * scale).round().clamp(0, 255);
+          b[i] = (pb * scale).round().clamp(0, 255);
           a[i] = hasAlpha ? (p.a * scale).round().clamp(0, 255) : 255;
         }
         if (a[i] != 255) alphaIsUsed = true;

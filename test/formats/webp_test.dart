@@ -20,6 +20,7 @@ import 'package:image/src/formats/webp/vp8l_encoder.dart';
 import 'package:image/src/formats/webp/vp8l_huffman_encoder.dart';
 import 'package:image/src/formats/webp/vp8l_optimal_parse.dart';
 import 'package:image/src/formats/webp/vp8l_predictor.dart';
+import 'package:image/src/formats/webp/webp_container.dart';
 import 'package:test/test.dart';
 
 import '../_test_util.dart';
@@ -223,9 +224,8 @@ void main() {
           expect(decoded!.width, equals(original.width));
           expect(decoded.height, equals(original.height));
 
-          // Every visible pixel must come back exactly. The colour under a
-          // fully transparent one is cleared by default, so it is not compared;
-          // the 'exact' test below is what holds that behaviour down.
+          // Every visible pixel must come back exactly, and what sits under
+          // a fully transparent one is left to the 'exact' test below
           for (var y = 0; y < original.height; y++) {
             for (var x = 0; x < original.width; x++) {
               final op = original.getPixel(x, y);
@@ -1293,18 +1293,18 @@ void main() {
           return image;
         }
 
-        test('are cleared by default and kept when exact', () {
+        test('are kept by default and cleared only when asked', () {
           final original = withHiddenColour();
 
-          final relaxed = decodeWebP(encodeWebP(original))!;
-          final exact = decodeWebP(encodeWebP(original, exact: true))!;
+          final strictImage = decodeWebP(encodeWebP(original))!;
+          final looseImage = decodeWebP(encodeWebP(original, exact: false))!;
 
-          var clearedByDefault = 0;
+          var cleared = 0;
           for (var y = 0; y < original.height; y++) {
             for (var x = 0; x < original.width; x++) {
               final want = original.getPixel(x, y);
-              final loose = relaxed.getPixel(x, y);
-              final strict = exact.getPixel(x, y);
+              final loose = looseImage.getPixel(x, y);
+              final strict = strictImage.getPixel(x, y);
 
               // Alpha survives either way, and so does every visible pixel.
               expect(loose.a, equals(want.a), reason: 'alpha at $x,$y');
@@ -1315,25 +1315,24 @@ void main() {
                     reason: 'visible pixel changed at $x,$y');
               }
 
-              // What is hidden is kept only when asked for.
               expect([strict.r, strict.g, strict.b],
                   equals([want.r, want.g, want.b]),
-                  reason: 'exact should have preserved $x,$y');
+                  reason: 'the default should have preserved $x,$y');
               if (want.a == 0 &&
                   loose.r == 0 &&
                   loose.g == 0 &&
                   loose.b == 0 &&
                   want.r != 0) {
-                clearedByDefault++;
+                cleared++;
               }
             }
           }
-          expect(clearedByDefault, greaterThan(0),
-              reason: 'nothing was cleared, so the default did nothing');
+          expect(cleared, greaterThan(0),
+              reason: 'nothing was cleared, so exact: false did nothing');
 
           // The whole point of clearing is that it codes smaller.
-          expect(encodeWebP(original).length,
-              lessThan(encodeWebP(original, exact: true).length));
+          expect(encodeWebP(original, exact: false).length,
+              lessThan(encodeWebP(original).length));
         });
       });
 
@@ -1492,6 +1491,164 @@ void main() {
             (_chunk(encodeWebP(transparent), 'VP8X')![0] >> 4) & 1, equals(1),
             reason: 'the same image with a transparency');
       });
+
+      test('the animation background color is scaled to eight bits', () {
+        // The chunk holds one byte a channel, so a sixteen bit source
+        // written raw spills its high byte into the channel packed above
+        final anim = Image(
+            width: 16, height: 16, numChannels: 3, format: Format.uint16)
+          ..backgroundColor = ColorUint16.rgba(0x1234, 0x5678, 0x9abc, 0xffff);
+        anim.addFrame().frameDuration = 100;
+
+        final payload = _chunk(encodeWebP(anim), 'ANIM')!;
+        expect(payload.sublist(0, 4), equals([0x9a, 0x56, 0x12, 0xff]),
+            reason: 'blue, green, red, alpha, each scaled from 16 bits');
+      });
+
+      test('a loop count past its field is clamped, not wrapped', () {
+        // Sixteen bits, so wrapping turns 70000 loops into 4464
+        int written(int loopCount) {
+          final anim = _flat(16, 16, 10, 20, 30)..loopCount = loopCount;
+          anim.addFrame(_flat(16, 16, 30, 20, 10)).frameDuration = 100;
+          final payload = _chunk(encodeWebP(anim), 'ANIM')!;
+          return payload[4] | (payload[5] << 8);
+        }
+
+        expect(written(70000), equals(0xffff), reason: 'past the field');
+        expect(written(-1), equals(0), reason: 'below the field');
+        expect(written(300), equals(300), reason: 'inside the field');
+      });
+
+      test('a frame duration past its field is clamped, not wrapped', () {
+        // Twenty four bits, so wrapping turns a negative duration into a pause
+        // of over four hours that webpinfo reports as sound
+        int written(int duration) {
+          final anim = _flat(16, 16, 10, 20, 30)..frameDuration = duration;
+          anim.addFrame(_flat(16, 16, 30, 20, 10)).frameDuration = 100;
+          final payload = _chunk(encodeWebP(anim), 'ANMF')!;
+          return payload[12] | (payload[13] << 8) | (payload[14] << 16);
+        }
+
+        expect(written(0x1000064), equals(0xffffff), reason: 'past the field');
+        expect(written(-5), equals(0), reason: 'below the field');
+        expect(written(100), equals(100), reason: 'inside the field');
+      });
+
+      test('refuses a frame larger than the canvas', () {
+        // libwebp's demuxer fails the whole file when a frame overruns the
+        // canvas, so the alternative is an animation that reads nowhere
+        final anim = _flat(32, 32, 10, 20, 30);
+        anim.addFrame(_flat(64, 64, 30, 20, 10)).frameDuration = 100;
+        expect(() => encodeWebP(anim), throwsA(isA<ImageException>()));
+
+        final wide = _flat(32, 32, 10, 20, 30);
+        wide.addFrame(_flat(64, 32, 30, 20, 10)).frameDuration = 100;
+        expect(() => encodeWebP(wide), throwsA(isA<ImageException>()),
+            reason: 'one side over is enough');
+
+        final small = _flat(32, 32, 10, 20, 30);
+        small.addFrame(_flat(16, 16, 30, 20, 10)).frameDuration = 100;
+        expect(decodeWebP(encodeWebP(small)), isNotNull);
+      });
+    });
+
+    group('animation round trip', () {
+      test('a semi transparent frame comes back at its own colour', () {
+        // Frames are whole pictures drawn on a canvas the previous frame
+        // cleared, and blending one against an empty canvas leaves its colour
+        // multiplied by its own alpha
+        final frame = _flat(16, 16, 200, 100, 50, channels: 4, alpha: 128);
+        frame
+            .addFrame(_flat(16, 16, 200, 100, 50, channels: 4, alpha: 128))
+            .frameDuration = 100;
+        frame.frameDuration = 100;
+
+        final back = decodeWebP(encodeWebP(frame))!;
+        expect(back.frames.length, equals(2));
+        for (var i = 0; i < back.frames.length; i++) {
+          final p = back.frames[i].getPixel(8, 8);
+          expect([p.r, p.g, p.b, p.a], equals([200, 100, 50, 128]),
+              reason: 'frame $i');
+        }
+      });
+
+      test('the dispose flag clears after its own frame, not before it', () {
+        // The flag says what to do once its own frame has been shown, so
+        // reading it as an instruction for that frame wipes what the previous
+        // one left behind
+        final red = _flat(32, 32, 255, 0, 0, channels: 4);
+        final blue = _flat(16, 16, 0, 0, 255, channels: 4);
+
+        // Only the second frame asks for a dispose, so the red one has to
+        // survive under the blue
+        final bytes = _animation([red, blue], const [false, true]);
+        final back = decodeWebP(bytes)!;
+
+        expect(back.frames.length, equals(2));
+        final covered = back.frames[1].getPixel(4, 4);
+        expect([covered.r, covered.g, covered.b], equals([0, 0, 255]),
+            reason: 'the blue frame itself');
+        final kept = back.frames[1].getPixel(24, 24);
+        expect([kept.r, kept.g, kept.b, kept.a], equals([255, 0, 0, 255]),
+            reason: 'the red frame was not disposed, so it shows through');
+      });
+
+      test('the decoded image carries the fields the file holds', () {
+        // The decoder parses loop count, background, ICC and EXIF into
+        // WebPInfo, and leaving them there drops them from a decode and
+        // encode again
+        final anim = _flat(16, 16, 10, 20, 30)
+          ..loopCount = 7
+          ..backgroundColor = ColorRgba8(255, 0, 0, 255)
+          ..frameDuration = 100
+          ..iccProfile = IccProfile('p', IccProfileCompression.none,
+              Uint8List.fromList(List<int>.generate(64, (i) => i)));
+        anim.exif.imageIfd['Make'] = 'roundtrip';
+        anim.addFrame(_flat(16, 16, 30, 20, 10)).frameDuration = 100;
+
+        final back = decodeWebP(encodeWebP(anim))!;
+
+        expect(back.loopCount, equals(7));
+        final bg = back.backgroundColor;
+        expect(bg, isNotNull, reason: 'background colour');
+        expect([bg!.r, bg.g, bg.b, bg.a], equals([255, 0, 0, 255]));
+        expect(back.iccProfile?.data.length, equals(64));
+        expect(back.exif.imageIfd['Make']?.toString(), equals('roundtrip'));
+      });
+
+      test('a still image carries its metadata too', () {
+        final still = _flat(16, 16, 10, 20, 30)
+          ..iccProfile = IccProfile('p', IccProfileCompression.none,
+              Uint8List.fromList(List<int>.generate(64, (i) => i)));
+        still.exif.imageIfd['Make'] = 'roundtrip';
+
+        final back = decodeWebP(encodeWebP(still))!;
+        expect(back.iccProfile?.data.length, equals(64));
+        expect(back.exif.imageIfd['Make']?.toString(), equals('roundtrip'));
+      });
+    });
+
+    group('metadata', () {
+      test('encoding leaves the profile on the image it was given alone', () {
+        // The profile has to be inflated for the chunk, and inflating in
+        // place leaves the caller a profile whose bytes no longer match its
+        // own compression field
+        final image = _flat(8, 8, 1, 2, 3)
+          ..iccProfile = IccProfile('p', IccProfileCompression.none,
+              Uint8List.fromList(List<int>.generate(512, (i) => i & 0xff)));
+        final deflated = image.iccProfile!.compressed();
+        final length = deflated.length;
+
+        final written = _chunk(encodeWebP(image), 'ICCP')!;
+
+        expect(image.iccProfile!.compression,
+            equals(IccProfileCompression.deflate),
+            reason: 'the profile on the image was decompressed in place');
+        expect(image.iccProfile!.data.length, equals(length),
+            reason: 'the bytes on the image were replaced');
+        expect(written.length, equals(512),
+            reason: 'the chunk carries the inflated profile');
+      });
     });
 
     group('alpha chunk', () {
@@ -1594,6 +1751,34 @@ void main() {
             }
           }
         }
+      });
+
+      test('a one channel image is grey, not red', () {
+        // Pixel.g and Pixel.b answer zero for a one channel image, so
+        // reading them writes the picture in red, while the lossy path
+        // converts to YUV and gets it right
+        final gray = Image(width: 32, height: 32, numChannels: 1);
+        for (var y = 0; y < 32; y++) {
+          for (var x = 0; x < 32; x++) {
+            gray.getPixel(x, y).r = x * 8;
+          }
+        }
+
+        final lossless = decodeWebP(encodeWebP(gray))!;
+        for (var y = 0; y < 32; y++) {
+          for (var x = 0; x < 32; x++) {
+            final want = gray.getPixel(x, y).r;
+            final p = lossless.getPixel(x, y);
+            expect([p.r, p.g, p.b], equals([want, want, want]),
+                reason: 'lossless at $x,$y');
+          }
+        }
+
+        final lossy =
+            decodeWebP(encodeWebP(gray, lossless: false, quality: 95))!;
+        final p = lossy.getPixel(20, 5);
+        expect(p.g, closeTo(p.r, 2), reason: 'lossy pixel is not grey');
+        expect(p.b, closeTo(p.r, 2), reason: 'lossy pixel is not grey');
       });
 
       test('a sixteen bit image is scaled down, not clipped', () {
@@ -1813,6 +1998,41 @@ Image _flat(int w, int h, int r, int g, int b,
     }
   }
   return im;
+}
+
+/// An animation built chunk by chunk, since [WebPEncoder] writes the same
+/// dispose flag on every frame
+Uint8List _animation(List<Image> frames, List<bool> clearAfter) {
+  final chunks = <WebPChunk>[
+    WebPChunk(
+        'VP8X',
+        vp8xChunkData(
+            vp8xFlags(
+                hasIcc: false,
+                hasAlpha: true,
+                hasExif: false,
+                hasXmp: false,
+                hasAnimation: true),
+            frames.first.width,
+            frames.first.height)),
+    WebPChunk('ANIM', animChunkData(0, 0, 0, 0, 0)),
+  ];
+  for (var i = 0; i < frames.length; i++) {
+    chunks.add(WebPChunk(
+        'ANMF',
+        anmfChunkData(
+            x: 0,
+            y: 0,
+            width: frames[i].width,
+            height: frames[i].height,
+            duration: 100,
+            clearToBackground: clearAfter[i],
+            blend: false,
+            frame: [
+              WebPChunk('VP8L', VP8LEncoder(exact: true).encodeVP8L(frames[i])),
+            ])));
+  }
+  return buildRiff(chunks);
 }
 
 /// The payload of the first [id] chunk of a RIFF file, or null.

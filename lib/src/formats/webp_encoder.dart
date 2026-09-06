@@ -1,6 +1,9 @@
 import 'dart:typed_data';
 
+import '../color/color.dart';
+import '../image/icc_profile.dart';
 import '../image/image.dart';
+import '../util/image_exception.dart';
 import '../util/output_buffer.dart';
 import 'encoder.dart';
 import 'webp/vp8_config.dart';
@@ -26,7 +29,7 @@ import 'webp/webp_container.dart';
 /// write back.
 class WebPEncoder extends Encoder {
   WebPEncoder({
-    this.exact = false,
+    this.exact = true,
     this.lossless = true,
     this.quality = 75,
     this.method = 4,
@@ -35,11 +38,9 @@ class WebPEncoder extends Encoder {
 
   /// Whether to preserve the colour under fully transparent pixels.
   ///
-  /// Those pixels show nothing, so by default the colour beneath them is
-  /// flattened into long runs, which compresses considerably better on images
-  /// with large transparent areas. Set this when the hidden colour matters,
-  /// for instance when the file is a step in a pipeline that will composite
-  /// it later. cwebp spells the same option `-exact`.
+  /// Clearing it flattens that colour into long runs, worth 15-20% on an image
+  /// with large transparent areas, which is what cwebp does unless given its
+  /// own `-exact`
   final bool exact;
 
   /// Whether to reproduce the image exactly.
@@ -96,10 +97,11 @@ class WebPEncoder extends Encoder {
   @override
   Uint8List encode(Image image, {bool singleFrame = false}) {
     final animate = !singleFrame && image.hasAnimation;
+    if (animate) {
+      _checkFramesFitCanvas(image);
+    }
     final exif = _exifBytes(image);
-    // WebP stores the ICC profile raw; deflating it, the way PNG's iCCP chunk
-    // does, would make it unreadable.
-    final icc = image.iccProfile?.decompressed();
+    final icc = _iccBytes(image);
 
     final frame = _encodeFrame(image);
     // A lossy bitstream cannot carry transparency itself, so a picture that
@@ -135,8 +137,12 @@ class WebPEncoder extends Encoder {
       final bg = image.backgroundColor;
       chunks.add(WebPChunk(
           'ANIM',
-          animChunkData(bg?.r.toInt() ?? 0, bg?.g.toInt() ?? 0,
-              bg?.b.toInt() ?? 0, bg?.a.toInt() ?? 0, image.loopCount)));
+          animChunkData(
+              _channel8(bg, (c) => c.r),
+              _channel8(bg, (c) => c.g),
+              _channel8(bg, (c) => c.b),
+              _channel8(bg, (c) => c.a),
+              image.loopCount)));
       for (final f in image.frames) {
         chunks.add(WebPChunk(
             'ANMF',
@@ -146,9 +152,10 @@ class WebPEncoder extends Encoder {
               width: f.width,
               height: f.height,
               duration: f.frameDuration,
-              // Frames are stored whole rather than as deltas against the
-              // previous one, so each starts from a cleared canvas.
+              // Frames are stored whole rather than as deltas, so each one
+              // clears the canvas and replaces it instead of blending onto it
               clearToBackground: true,
+              blend: false,
               frame: identical(f, image) ? frame : _encodeFrame(f),
             )));
       }
@@ -183,6 +190,44 @@ class WebPEncoder extends Encoder {
       if (alpha != null) WebPChunk('ALPH', alpha),
       WebPChunk('VP8 ', coded.bitstream),
     ];
+  }
+
+  /// libwebp's demuxer rejects the whole file when a frame overruns the
+  /// canvas, rather than skipping that one frame
+  static void _checkFramesFitCanvas(Image image) {
+    // The index is counted rather than read off the frame, since frameIndex is
+    // only filled in by addFrame
+    for (var i = 0; i < image.frames.length; i++) {
+      final f = image.frames[i];
+      if (f.width > image.width || f.height > image.height) {
+        throw ImageException('WebP animation frames must fit the '
+            '${image.width}x${image.height} canvas, but frame $i is '
+            '${f.width}x${f.height}.');
+      }
+    }
+  }
+
+  /// One channel of [color], scaled rather than truncated: a wider channel
+  /// written raw spills into the byte packed above it
+  static int _channel8(Color? color, num Function(Color) channel) {
+    if (color == null) {
+      return 0;
+    }
+    final max = color.maxChannelValue;
+    final value = channel(color);
+    return (max == 255 ? value : value * 255 / max).round().clamp(0, 255);
+  }
+
+  /// [IccProfile.decompressed] inflates in place, so a deflated profile is
+  /// copied first and encoding leaves the image it was given untouched
+  static Uint8List? _iccBytes(Image image) {
+    final profile = image.iccProfile;
+    if (profile == null) {
+      return null;
+    }
+    return profile.compression == IccProfileCompression.none
+        ? profile.data
+        : profile.clone().decompressed();
   }
 
   /// Whether any frame has a pixel that is not fully opaque.

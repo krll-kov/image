@@ -204,6 +204,9 @@ void main() {
         final source = _scene(size[0], size[1], alpha: true);
         final what = '${size[0]}x${size[1]}';
 
+        // Named rather than left to the default, since this test is about
+        // exact: true and not about what the default happens to be
+        // ignore: avoid_redundant_argument_values
         final lossless = decodeWebP(encodeWebP(source, exact: true))!;
         for (var y = 0; y < source.height; y++) {
           for (var x = 0; x < source.width; x++) {

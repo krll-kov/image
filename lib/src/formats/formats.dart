@@ -489,13 +489,16 @@ Future<Image?> decodeWebPFile(String path, {int? frame}) async {
 ///   difference is seconds over a whole run.
 ///
 /// [alphaQuality] and [exact] only do anything when the image has
-/// transparency; see [WebPEncoder] for what they mean.
+/// transparency; see [WebPEncoder] for what they mean. Clearing [exact] drops
+/// the color under fully transparent pixels, worth 15-20% on an image with
+/// large transparent areas
 ///
 /// An image with more than one frame is written as an animation unless
-/// [singleFrame] asks for just the first.
+/// [singleFrame] asks for just the first, and a frame larger than the canvas
+/// is refused
 Uint8List encodeWebP(Image image,
         {bool singleFrame = false,
-        bool exact = false,
+        bool exact = true,
         bool lossless = true,
         int quality = 75,
         int method = 4,
@@ -514,7 +517,7 @@ Uint8List encodeWebP(Image image,
 /// [quality] and [method] do nothing without `lossless: false`.
 Future<bool> encodeWebPFile(String path, Image image,
     {bool singleFrame = false,
-    bool exact = false,
+    bool exact = true,
     bool lossless = true,
     int quality = 75,
     int method = 4,

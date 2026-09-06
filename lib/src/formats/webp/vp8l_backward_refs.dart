@@ -328,10 +328,10 @@ class _Lz77 {
   /// is left, to spread the run across slots. Tried here and reverted: it made
   /// the PNG suite 11% larger and the encode 36% slower. With a pair key, the
   /// most recent entry in a run's slot is the immediately preceding pixel, so
-  /// the search finds a full-length match at distance 1 — the cheapest
-  /// distance code there is — on its first step. Spreading the run replaces
-  /// that with distant candidates. libwebp can afford it because it tries an
-  /// RLE pass as a separate strategy.
+  /// the search finds a full-length match at distance 1, the cheapest distance
+  /// code there is, on its first step. Spreading the run replaces that with
+  /// distant candidates, which libwebp can afford because it tries an RLE pass
+  /// as a separate strategy
   @pragma('vm:unsafe:no-bounds-checks')
   void fillChain() {
     final n = _numPixels;
